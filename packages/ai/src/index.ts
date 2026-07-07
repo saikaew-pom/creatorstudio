@@ -1,5 +1,6 @@
 // Provider router (BLUEPRINT §2, doc 02 §0.1): Gemini REST, JSON mode, retry + schema repair.
 import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ModelTier, PromptModule } from "@cs/prompts";
 
 const MODEL_MAP: Record<Extract<ModelTier, "fast" | "smart">, string> = {
@@ -32,22 +33,73 @@ export class AiError extends Error {
   }
 }
 
+/**
+ * Gemini's `responseSchema` accepts only a restricted OpenAPI-3 subset:
+ * type/format/description/nullable/enum/items/properties/required/propertyOrdering/
+ * minItems/maxItems. Strip everything else (JSON-Schema-only keywords like
+ * additionalProperties, $schema, $ref, definitions) that zod-to-json-schema emits.
+ */
+function toGeminiSchema(schema: z.ZodType): unknown {
+  const json = zodToJsonSchema(schema, { target: "openApi3", $refStrategy: "none" });
+  const ALLOWED = new Set([
+    "type", "format", "description", "nullable", "enum", "items", "properties",
+    "required", "propertyOrdering", "minItems", "maxItems", "minLength", "maxLength",
+    "minimum", "maximum",
+  ]);
+  // NB: `properties` and `required`/`enum` hold data (property names / literal values),
+  // not nested schema nodes to filter by ALLOWED — they need dedicated handling below,
+  // everything else is either a primitive or a nested schema node to recurse into.
+  function sanitize(node: unknown): unknown {
+    if (!node || typeof node !== "object") return node;
+    const src = node as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(src)) {
+      if (!ALLOWED.has(k)) continue;
+      if (k === "properties") {
+        const props: Record<string, unknown> = {};
+        for (const [propName, propSchema] of Object.entries(v as Record<string, unknown>)) {
+          props[propName] = sanitize(propSchema);
+        }
+        out.properties = props;
+      } else if (k === "items") {
+        out.items = sanitize(v);
+      } else if (k === "required" || k === "enum") {
+        out[k] = v; // arrays of primitive strings — leave as-is
+      } else {
+        out[k] = v; // primitives: type, format, description, nullable, min/maxItems, etc.
+      }
+    }
+    if (out.properties && out.required === undefined) {
+      // Gemini requires `required` to be present when properties exist for reliable output
+      out.required = Object.keys(out.properties as Record<string, unknown>);
+    }
+    return out;
+  }
+  return sanitize(json);
+}
+
 async function callGemini(
   model: string,
   system: string,
   user: string,
   temperature: number,
   apiKey: string,
-  signal?: AbortSignal
+  opts: { schema?: unknown; thinkingBudget?: number; signal?: AbortSignal } = {}
 ): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const generationConfig: Record<string, unknown> = {
+    temperature,
+    responseMimeType: "application/json",
+    maxOutputTokens: 16384,
+  };
+  if (opts.schema) generationConfig.responseSchema = opts.schema;
+  if (opts.thinkingBudget !== undefined)
+    generationConfig.thinkingConfig = { thinkingBudget: opts.thinkingBudget };
+
   const body = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [{ text: user }] }],
-    generationConfig: {
-      temperature,
-      responseMimeType: "application/json",
-    },
+    generationConfig,
   };
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -56,7 +108,7 @@ async function callGemini(
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
-        signal,
+        signal: opts.signal,
       });
       if (res.status === 429)
         throw new AiError("โควต้าโมเดลเต็มชั่วคราว ลองใหม่อีกครั้ง", "quota");
@@ -67,10 +119,18 @@ async function callGemini(
         continue; // retry 5xx once
       }
       const json = (await res.json()) as {
-        candidates?: { content?: { parts?: { text?: string }[] } }[];
+        candidates?: {
+          content?: { parts?: { text?: string }[] };
+          finishReason?: string;
+        }[];
       };
-      const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") ?? "";
-      if (!text) throw new AiError("empty response", "provider", json);
+      const candidate = json.candidates?.[0];
+      const text = candidate?.content?.parts?.map((p) => p.text).join("") ?? "";
+      if (!text) {
+        if (candidate?.finishReason === "MAX_TOKENS")
+          throw new AiError("คำตอบยาวเกินขีดจำกัด ลองย่อคำสั่งลง", "provider", json);
+        throw new AiError("empty response", "provider", json);
+      }
       return text;
     } catch (e) {
       if (e instanceof AiError && e.code !== "provider") throw e;
@@ -101,14 +161,21 @@ export async function run<I, O>(
 ): Promise<RunResult<O>> {
   const apiKey = opts.apiKey ?? process.env.GEMINI_API_KEY;
   if (!apiKey) throw new AiError("ยังไม่ได้ตั้งค่า GEMINI_API_KEY", "auth");
-  const model =
-    opts.modelOverride ??
-    MODEL_MAP[(mod.model === "smart" ? "smart" : "fast") as "fast" | "smart"];
+  const tier = opts.modelOverride ? undefined : mod.model === "smart" ? "smart" : "fast";
+  const model = opts.modelOverride ?? MODEL_MAP[tier as "fast" | "smart"];
   const system = mod.system(input);
   const user = mod.user(input);
   const t0 = Date.now();
+  const geminiSchema = toGeminiSchema(mod.schema as unknown as z.ZodType);
+  // Structured extraction doesn't need deep reasoning; skip "thinking" on the fast
+  // tier for latency/cost, keep default (auto) reasoning on the smart tier for refine.
+  const thinkingBudget = tier === "fast" ? 0 : undefined;
 
-  let raw = await callGemini(model, system, user, mod.temperature, apiKey, opts.signal);
+  let raw = await callGemini(model, system, user, mod.temperature, apiKey, {
+    schema: geminiSchema,
+    thinkingBudget,
+    signal: opts.signal,
+  });
   let repaired = false;
 
   for (let round = 0; round < 2; round++) {
@@ -134,7 +201,7 @@ export async function run<I, O>(
         )}\n\nJSON:\n${raw}\n\nReturn the corrected JSON only.`,
         0.1,
         apiKey,
-        opts.signal
+        { schema: geminiSchema, thinkingBudget: 0, signal: opts.signal }
       );
       repaired = true;
     } catch (e) {
@@ -146,7 +213,7 @@ export async function run<I, O>(
         `Malformed JSON:\n${raw}\n\nReturn valid JSON only.`,
         0.1,
         apiKey,
-        opts.signal
+        { schema: geminiSchema, thinkingBudget: 0, signal: opts.signal }
       );
       repaired = true;
     }
