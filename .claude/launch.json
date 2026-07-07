@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "content",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@cs/content", "dev"],
+      "port": 3100
+    },
+    {
+      "name": "studio",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@cs/studio", "dev"],
+      "port": 3200
+    }
+  ]
+}
