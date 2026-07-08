@@ -11,9 +11,23 @@ AI-powered creator studio for the Thai market — two apps, one monorepo.
 | `packages/prompts` — all prompt modules + zod schemas (doc 02) | ✅ typechecks, live-verified |
 | `packages/ai` — Gemini router, real `responseSchema`, JSON repair, patch-merge refine | ✅ typechecks, live-verified |
 | `packages/db` — full Postgres schema + RLS + credit/quota/refund RPCs + storage + client layer + auth | ✅ **verified against real Postgres (PGlite) with RLS actually enforced, 30/30** |
-| `apps/content` — Content Studio + Image Studio + auth + /credits + /history + /collections + /calendar + quota-gated persistence | ✅ **M1 + M3 live-verified end-to-end on hosted Supabase** (see below) |
+| `apps/content` — Content/Image/Viral Studio + Brand Voice + Style Cloner + auth + /credits + /history + /collections + /calendar | ✅ **M1 + M3 + M4-core live-verified on hosted Supabase** (see below) |
 | `apps/studio` — dashboard + editor steps 01–02 (script→typed segments, elements picker) | ✅ builds, UI verified |
 | Video render pipeline, MCP, payments | ⬜ next (docs/06 M5+; payments deferred) |
+
+**M4-core live-verified (2026-07-09, hosted Supabase):** created a brand via the wizard
+(told a Thai story → AI extracted name/audience/tone/pronoun, flagged 4 fields as guessed →
+saved) → generated content in Content Studio with that brand selected → **output unmistakably
+in the brand voice** ("เฮียหมี", "น้อง", "จ้า", banned word "พรีเมียม" absent), proving
+BRAND_BLOCK injection through the full chain (brand loaded server-side by id, RLS-scoped) →
+Viral Studio gallery listed all templates → generated a RoastMaster kit → **usage_count
+incremented 0→1** and the kit persisted. QA evals 6/7/8 pass in the harness (11/11 each);
+eval 2 (brand tone-shift) green. Deferred to a follow-up: Inspiration gallery + remix prefill
++ Hero-of-the-week, and the dashboard onboarding checklist + streak (lower-risk curation/polish;
+need admin-curated content to be meaningful).
+
+Regression harnesses: `scripts/eval-brand-style.mjs`, `scripts/eval-viral-kit.mjs`
+(run with `set -a && source .env && set +a && npx tsx scripts/eval-*.mjs`).
 
 **M1 live-verified (2026-07-08, hosted Supabase):** signed up a confirmed user → signup
 trigger auto-created the profile + granted 20 monthly credits → signed in through the browser
