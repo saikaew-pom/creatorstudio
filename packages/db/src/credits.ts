@@ -41,23 +41,25 @@ export async function debitCredits(
   return data as number;
 }
 
-/** Refund is just a positive ledger row (never mutate prior rows — append-only). */
+/** Refund via the refund_credits RPC (doc 03 migration 0003) — NOT a raw insert.
+ * credit_transactions has an RLS SELECT policy for owners but deliberately no
+ * INSERT policy (writes are meant to go through SECURITY DEFINER RPCs only); a
+ * raw `.insert()` here was tried first and found live to fail silently under
+ * RLS, which meant a failed generation debited credits and never gave them
+ * back. See packages/db/test/migration.test.ts for the regression coverage. */
 export async function refundCredits(
   db: SupabaseClient,
-  userId: string,
   amount: number,
-  opts: { bucket?: CreditBucket; note: string; refType?: string; refId?: string }
-): Promise<void> {
-  const { error } = await db.from("credit_transactions").insert({
-    user_id: userId,
-    amount,
-    kind: "refund",
-    bucket: opts.bucket ?? "purchased",
-    ref_type: opts.refType ?? null,
-    ref_id: opts.refId ?? null,
-    note: opts.note,
+  opts: { note: string; refType?: string; refId?: string }
+): Promise<number> {
+  const { data, error } = await db.rpc("refund_credits", {
+    p_amount: amount,
+    p_note: opts.note,
+    p_ref_type: opts.refType ?? null,
+    p_ref_id: opts.refId ?? null,
   });
   if (error) throw error;
+  return data as number;
 }
 
 /** Consume one unit of the daily free quota for a tool. Returns remaining count,

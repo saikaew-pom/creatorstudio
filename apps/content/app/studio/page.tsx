@@ -47,6 +47,10 @@ function StudioInner() {
   const [visualTab, setVisualTab] = useState<"cover" | "ill" | "video">("cover");
   const [refineText, setRefineText] = useState("");
   const [generationId, setGenerationId] = useState<string | undefined>();
+  const [coverThaiText, setCoverThaiText] = useState(false);
+  const [coverLoading, setCoverLoading] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  const [coverImage, setCoverImage] = useState<{ url: string; creditsSpent: number } | null>(null);
 
   async function generate() {
     setLoading("กำลังสร้างชุดคอนเทนต์… (hook · สคริปต์ · visual · แฮชแท็ก)");
@@ -94,6 +98,35 @@ function StudioInner() {
   function sectionRefine(section: "hook" | "script" | "visual" | "hashtags") {
     const inst = window.prompt("จะให้ปรับยังไงดี? เช่น 'สั้นลง', 'เป็นกันเองขึ้น'");
     if (inst) void refineAll(section, inst);
+  }
+
+  async function generateCover() {
+    if (!kit) return;
+    setCoverLoading(true);
+    setCoverError(null);
+    try {
+      const validAspects = ["1:1", "4:5", "9:16", "16:9", "2:3"];
+      const aspect = validAspects.includes(kit.visual.cover.base_aspect)
+        ? kit.visual.cover.base_aspect
+        : "4:5";
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          description: kit.visual.cover.prompt_en,
+          aspect,
+          thai_text_mode: coverThaiText,
+          skip_enhance: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setCoverImage({ url: data.url, creditsSpent: data.creditsSpent });
+    } catch (e) {
+      setCoverError((e as Error).message);
+    } finally {
+      setCoverLoading(false);
+    }
   }
 
   const activeHook =
@@ -222,6 +255,25 @@ function StudioInner() {
                 <p><span className="pill">{kit.visual.cover.base_aspect} → {kit.visual.cover.crop_hint}</span> <b>{kit.visual.cover.label}</b></p>
                 <div className="prompt-box">{kit.visual.cover.prompt_en}</div>
                 <button className="btn sm" style={{ marginTop: 8 }} onClick={() => copy(kit.visual.cover.prompt_en)}>คัดลอก Prompt</button>
+
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, cursor: "pointer" }}>
+                  <input type="checkbox" checked={coverThaiText} onChange={(e) => setCoverThaiText(e.target.checked)} />
+                  <span className="dim">ใส่ข้อความไทยในรูปด้วย (Pro · 5 เครดิต) · ไม่ติ๊ก = เจนรูปอย่างเดียว (Standard · 1 เครดิต)</span>
+                </label>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+                  <span className="pill">ใช้ {coverThaiText ? 5 : 1} เครดิต</span>
+                  <button className="btn primary" disabled={coverLoading} onClick={generateCover}>
+                    {coverLoading ? <><span className="spin" /> กำลังสร้างรูป…</> : coverImage ? "🔄 เจนใหม่" : "✨ สร้างรูปนี้"}
+                  </button>
+                </div>
+                {coverError && <p style={{ color: "var(--danger)" }}>{coverError}</p>}
+                {coverImage && (
+                  <div style={{ marginTop: 12 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={coverImage.url} alt={kit.visual.cover.label} style={{ maxWidth: "100%", borderRadius: 12, display: "block" }} />
+                    <a className="btn sm" style={{ marginTop: 8 }} href={coverImage.url} download target="_blank" rel="noreferrer">⬇ ดาวน์โหลด</a>
+                  </div>
+                )}
               </div>
             )}
             {visualTab === "ill" && kit.visual.illustrations.map((ill, i) => (

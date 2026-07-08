@@ -20,6 +20,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migDir = path.resolve(__dirname, "../migrations");
 const migration = readFileSync(path.join(migDir, "0001_init.sql"), "utf8");
 const migration2 = readFileSync(path.join(migDir, "0002_profile_bootstrap.sql"), "utf8");
+const migration3 = readFileSync(path.join(migDir, "0003_refund_rpc.sql"), "utf8");
 
 let pass = 0;
 let fail = 0;
@@ -48,6 +49,9 @@ await db.exec(`
   do $$ begin
     if not exists (select from pg_roles where rolname = 'authenticated') then create role authenticated; end if;
     if not exists (select from pg_roles where rolname = 'anon') then create role anon; end if;
+    if not exists (select from pg_roles where rolname = 'service_role') then
+      create role service_role bypassrls;
+    end if;
   end $$;
 `);
 
@@ -58,12 +62,44 @@ async function scalar<T = unknown>(sql: string): Promise<T> {
   const r = await db.query<{ v: T }>(sql);
   return r.rows[0]?.v as T;
 }
+/** Runs sql AS a given Postgres role, so RLS is actually enforced (not bypassed
+ * by table ownership) — mirrors PostgREST, which always connects as anon or
+ * authenticated, never as the owning/superuser role. */
+async function asRole<T = unknown>(role: string, sql: string): Promise<{ ok: true; v: T } | { ok: false; error: string }> {
+  try {
+    await db.exec(`set role ${role};`);
+    const r = await db.query<{ v: T }>(sql);
+    return { ok: true, v: r.rows[0]?.v as T };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  } finally {
+    await db.exec(`reset role;`);
+  }
+}
+
+// Supabase grants broad table-level SQL privileges to anon/authenticated/service_role
+// automatically at project creation, BEFORE any user migration runs, via standing
+// ALTER DEFAULT PRIVILEGES rules (so tables/functions created later — i.e. by our
+// migrations — inherit the grant automatically, no re-granting needed). RLS
+// policies are the fine-grained gate layered on top. Replicating the real
+// ordering matters: PGlite previously ran everything as an unrestricted owner
+// role, which is exactly how the refund-RLS bug (missing INSERT policy on
+// credit_transactions) went undetected locally — this baseline must run FIRST so
+// a migration's own REVOKE (0001's append-only guard) correctly applies on top
+// of it, not get silently undone by a later grant.
+await db.exec(`
+  grant usage on schema public to anon, authenticated, service_role;
+  alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+  alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+  alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+`);
 
 // ---- Apply the real migrations (in order) ----
 try {
   await db.exec(migration);
   await db.exec(migration2);
-  check("migrations 0001 + 0002 apply cleanly against real Postgres", true);
+  await db.exec(migration3);
+  check("migrations 0001 + 0002 + 0003 apply cleanly against real Postgres", true);
 } catch (e) {
   check(`migrations apply cleanly — ERROR: ${(e as Error).message}`, false);
   console.log(`\n${pass} passed, ${fail} failed\n`);
@@ -147,10 +183,24 @@ check("over-balance debit returns -1", insufficient === -1);
 const balUnchanged = await scalar<number>(`select coalesce(sum(amount),0) as v from credit_transactions where user_id='${USER_B}'`);
 check("balance unchanged after failed debit (still 8)", balUnchanged === 8);
 
-// ---- refund is just a positive ledger row ----
-console.log("\n== refund via ledger row ==");
-await db.exec(`insert into credit_transactions (user_id, amount, kind, bucket, note) values ('${USER_B}', 7, 'refund', 'purchased', 'gen failed')`);
-check("refund restores balance to 15", (await scalar<number>(`select coalesce(sum(amount),0) as v from credit_transactions where user_id='${USER_B}'`)) === 15);
+// ---- refund_credits RPC (0003) — regression test for the live bug where a plain
+// authenticated-role insert into credit_transactions silently failed under RLS,
+// so a failed generation debited credits and never gave them back ----
+console.log("\n== refund_credits RPC (regression: RLS blocks raw insert, RPC bypasses correctly) ==");
+const rawInsertAsAuth = await asRole(
+  "authenticated",
+  `insert into credit_transactions (user_id, amount, kind, bucket, note) values ('${USER_B}', 7, 'refund', 'purchased', 'raw insert attempt') returning 1 as v`
+);
+check(
+  "raw INSERT as authenticated role is rejected by RLS (this is the exact bug — no INSERT policy exists)",
+  rawInsertAsAuth.ok === false
+);
+const rpcRefundAsAuth = await asRole("authenticated", `select refund_credits(7, 'gen failed', 'image_studio', null) as v`);
+check("refund_credits RPC succeeds as authenticated (SECURITY DEFINER bypasses the gap)", rpcRefundAsAuth.ok === true);
+check(
+  "refund restores balance to 15",
+  (await scalar<number>(`select coalesce(sum(amount),0) as v from credit_transactions where user_id='${USER_B}'`)) === 15
+);
 
 // ---- ledger is append-only for clients (REVOKE applied) ----
 console.log("\n== ledger append-only guard ==");

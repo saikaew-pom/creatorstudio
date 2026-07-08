@@ -2,6 +2,10 @@
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ModelTier, PromptModule } from "@cs/prompts";
+import { AiError } from "./errors";
+
+export { AiError } from "./errors";
+export * from "./image";
 
 const MODEL_MAP: Record<Extract<ModelTier, "fast" | "smart">, string> = {
   fast: "gemini-2.5-flash",
@@ -21,16 +25,6 @@ export interface RunResult<O> {
   latency_ms: number;
   prompt_id: string;
   repaired: boolean;
-}
-
-export class AiError extends Error {
-  constructor(
-    message: string,
-    public code: "provider" | "schema" | "auth" | "quota",
-    public detail?: unknown
-  ) {
-    super(message);
-  }
 }
 
 /**
