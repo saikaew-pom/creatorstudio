@@ -10,10 +10,24 @@ AI-powered creator studio for the Thai market — two apps, one monorepo.
 | Blueprint pack (7 docs) | ✅ complete |
 | `packages/prompts` — all prompt modules + zod schemas (doc 02) | ✅ typechecks, live-verified |
 | `packages/ai` — Gemini router, real `responseSchema`, JSON repair, patch-merge refine | ✅ typechecks, live-verified |
-| `packages/db` — full Postgres schema + RLS + credit/quota RPCs | ✅ SQL ready (not yet applied) |
-| `apps/content` — dashboard + Content Studio (generate/hooks/refine/refine-all/brainstorm APIs + full result UI) | ✅ builds, **live-verified end-to-end with real Gemini key** |
+| `packages/db` — full Postgres schema + RLS + credit/quota RPCs + client layer + auth | ✅ **migration + ledger RPCs verified against real Postgres (PGlite), 28/28** |
+| `apps/content` — dashboard + Content Studio + auth (login/callback/middleware) + /credits + quota-gated persistence | ✅ builds, **content gen live-verified with real Gemini key** |
 | `apps/studio` — dashboard + editor steps 01–02 (script→typed segments, elements picker) | ✅ builds, UI verified |
-| Supabase wiring, image gen, video render pipeline, MCP | ⬜ next (docs/06 M1, M3, M5+) |
+| Image gen, video render pipeline, MCP, payments | ⬜ next (docs/06 M3, M5+; payments deferred) |
+
+### One-time Supabase setup (required to enable auth + persistence + credits)
+
+1. Fill `.env` with your project's `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+   `SUPABASE_SERVICE_ROLE_KEY` (Supabase dashboard → Project Settings → API).
+2. Apply the schema: open your project's **SQL Editor** and run
+   `packages/db/migrations/_apply_all.generated.sql` (0001 + 0002 combined; regenerate any time
+   with `cat packages/db/migrations/000*.sql > ...`). This is the standard hosted-Supabase DDL
+   path — PostgREST can't run raw SQL, so it's a dashboard paste.
+3. (For Google login) enable the Google provider in Auth → Providers and add
+   `<app-url>/auth/callback` as a redirect URL.
+
+Until step 2 is done the app runs in **degraded mode**: UI + AI generation work, but there's no
+login, no saved history, and no credit ledger (exactly the pre-M1 behavior).
 
 **Live verification**: `scripts/eval-content-kit.mjs` runs doc-02 §QA evals against the real
 Gemini API — 20/20 passing across two independent runs, confirming: full content kit generates

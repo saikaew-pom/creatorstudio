@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { contentKit, type ContentKitInput } from "@cs/prompts";
 import { run, AiError } from "@cs/ai";
+import { insertGeneration } from "@cs/db";
+import { gateGeneration, gateError } from "../../../lib/gate";
 
 export const maxDuration = 60;
 
@@ -10,10 +12,40 @@ export async function POST(req: NextRequest) {
     if (!input.topic?.trim() || !input.platforms?.length) {
       return NextResponse.json({ error: "กรอกหัวข้อและเลือกแพลตฟอร์มก่อน" }, { status: 400 });
     }
-    // TODO(M1): daily-quota RPC + persist to `generations` (Supabase)
+
+    // Auth + daily-quota gate (no-op in unconfigured/dev mode).
+    const gate = await gateGeneration("content_studio");
+    const gateErr = gateError(gate);
+    if (gateErr) return NextResponse.json(gateErr.body, { status: gateErr.status });
+
     const result = await run(contentKit, input);
+
+    // Persist for /history, reopen-via-?jobId, and Inspiration remix (only when signed in).
+    let generationId: string | undefined;
+    if (gate.kind === "ok") {
+      try {
+        const gen = await insertGeneration(gate.db, {
+          user_id: gate.userId,
+          type: "content_kit",
+          tool: "content_studio",
+          title: result.output.topic_refined,
+          input,
+          output: result.output,
+          prompt_id: result.prompt_id,
+          model: result.model,
+          niche: input.niche,
+          platform: input.platforms,
+        });
+        generationId = gen.id;
+      } catch {
+        // Persistence failure shouldn't lose the user's generated content — return it anyway.
+      }
+    }
+
     return NextResponse.json({
       kit: result.output,
+      generationId,
+      remaining: gate.kind === "ok" ? gate.remaining : undefined,
       meta: { prompt_id: result.prompt_id, model: result.model, latency_ms: result.latency_ms },
     });
   } catch (e) {

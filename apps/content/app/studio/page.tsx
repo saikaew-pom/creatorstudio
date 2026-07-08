@@ -46,6 +46,7 @@ function StudioInner() {
   const [scriptTab, setScriptTab] = useState(0);
   const [visualTab, setVisualTab] = useState<"cover" | "ill" | "video">("cover");
   const [refineText, setRefineText] = useState("");
+  const [generationId, setGenerationId] = useState<string | undefined>();
 
   async function generate() {
     setLoading("กำลังสร้างชุดคอนเทนต์… (hook · สคริปต์ · visual · แฮชแท็ก)");
@@ -59,6 +60,7 @@ function StudioInner() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setKit(data.kit);
+      setGenerationId(data.generationId);
       setScriptTab(0);
     } catch (e) {
       setError((e as Error).message);
@@ -76,7 +78,7 @@ function StudioInner() {
       const res = await fetch("/api/refine", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kit, instruction: inst, section }),
+        body: JSON.stringify({ kit, instruction: inst, section, generationId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);

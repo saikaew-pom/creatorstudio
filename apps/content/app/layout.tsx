@@ -1,6 +1,8 @@
 import "./globals.css";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { getServerSupabase, isSupabaseConfigured } from "../lib/supabase-server";
+import { AccountFooter } from "./account-footer";
 
 export const metadata: Metadata = {
   title: "Creator Studio — Content Engine",
@@ -21,10 +23,18 @@ const NAV = [
   { group: "ของฉัน", items: [
     { href: "/history", t: "ผลงานของฉัน", s: "ภาพ · เนื้อหา · เทรนด์" },
     { href: "/calendar", t: "ปฏิทินคอนเทนต์", s: "วางแผนโพสต์รายเดือน" },
+    { href: "/credits", t: "เครดิต", s: "เครดิตคงเหลือ · เติมเครดิต" },
   ]},
 ];
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+async function getAccount(): Promise<{ email: string | null } | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data } = await getServerSupabase().auth.getUser();
+  return data.user ? { email: data.user.email ?? null } : { email: null };
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const account = await getAccount();
   return (
     <html lang="th">
       <body>
@@ -46,6 +56,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 ))}
               </div>
             ))}
+            <div style={{ marginTop: "auto" }}>
+              <AccountFooter
+                configured={isSupabaseConfigured()}
+                email={account?.email ?? null}
+              />
+            </div>
           </aside>
           <main className="main">{children}</main>
         </div>

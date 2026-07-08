@@ -1,5 +1,6 @@
 -- Creator Studio — initial schema (docs/03-data-model.md)
-create extension if not exists pgcrypto;
+-- gen_random_uuid() is core Postgres (v13+) and present on Supabase (v15+),
+-- so no pgcrypto extension is required.
 
 -- 1. Identity & plan -----------------------------------------------------
 create table profiles (
