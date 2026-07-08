@@ -310,41 +310,83 @@ UI: popover list; clicking an idea fills the topic input.
 
 ## §R Refine loops {#r-refine}
 
-The pattern that makes the product feel alive. Two variants:
+The pattern that makes the product feel alive.
 
-### R.1 Section refine — "ปรับ" on one section
+> **v2 redesign (2026-07-09), supersedes the original "echo the full kit back"
+> design.** The original approach asked the model to return the *entire* kit
+> JSON every time, with untouched sections copied back byte-for-byte, and
+> relied on a code-level diff/restore as a safety net. Live testing against
+> real Gemini output broke this: `gemini-2.5-pro`, while correctly refining an
+> unrelated section under a *refine-all* instruction, corrupted an untouched
+> `hashtags` array into one garbled merged string. The lesson: **an untouched
+> section the model is asked to echo can still be mutated — don't build the
+> guarantee on model discipline when you can build it on construction
+> instead.** The fix below asks the model for a **patch** (only the keys it is
+> actually changing) and merges in code. A section absent from the patch is
+> untouched by definition — there is nothing for the model to corrupt.
+
+### R.1 Patch schema
+
+```ts
+const ContentKitPatchSchema = z.object({
+  hooks: ContentKitSchema.shape.hooks,
+  scripts: ContentKitSchema.shape.scripts,
+  visual: ContentKitSchema.shape.visual,
+  hashtags: ContentKitSchema.shape.hashtags,
+}).partial();
+```
+Only `hooks` / `scripts` / `visual` / `hashtags` are patchable (matches the 4 UI sections).
+`topic_refined` and `cta` are never touched by refine.
+
+**Gemini responseSchema gotcha**: converting a zod `.partial()` schema to Gemini's
+`responseSchema` must NOT auto-inject `required: [all keys]` at the root — doing so silently
+tells Gemini every key is mandatory (defeating the whole point of a patch), which is exactly
+what caused the model to return all 4 sections on every call during testing. The schema
+converter must only default-to-`required-all` for **nested** object schemas (each key's own
+value must still be internally complete when present), never for the **root** of a
+patch-shaped schema. See `packages/ai/src/index.ts` `toGeminiSchema(schema, { requireAllTopLevel })`.
+
+### R.2 Section refine — "ปรับ" on one section
 
 **Model**: `fast`, temperature 0.6 (obedience > creativity).
 
 System:
 ```
-คุณคือบรรณาธิการคอนเทนต์ หน้าที่เดียวของคุณคือ "แก้ไขตามคำสั่ง" โดยแตะให้น้อยที่สุด
-- แก้เฉพาะส่วน {{section_name}} ตามคำสั่งผู้ใช้
-- รักษาโครงสร้าง JSON schema เดิมเป๊ะ
-- ส่วนอื่นที่ไม่เกี่ยว: คืนค่าเดิมแบบตัวอักษรต่อตัวอักษร ห้ามแก้ ห้าม "ปรับปรุงเอง"
+คุณคือบรรณาธิการคอนเทนต์ หน้าที่เดียวของคุณคือ "แก้ไขตามคำสั่ง"
+- ผู้ใช้ระบุมาแล้วว่าต้องการแก้เฉพาะส่วน "{{section_key}}" เท่านั้น
+- ตอบกลับเป็น JSON ที่มีเฉพาะ key ของส่วนที่คุณแก้ไขจริงเท่านั้น (hooks, scripts, visual, hashtags — เลือกเฉพาะที่เกี่ยว)
+- ห้ามใส่ key ของส่วนที่ไม่ได้แก้ไขลงในคำตอบเลย แม้แต่ส่วนเดียว — ระบบจะเก็บของเดิมไว้เองสำหรับ key ที่คุณไม่ได้ส่งมา
+- ถ้าแก้ "scripts" หรือ "hashtags" ต้องส่งทั้ง array กลับมาครบ (ทุก platform เดิม) ไม่ใช่แค่รายการที่เปลี่ยน
 - ถ้าคำสั่งกำกวม เลือกการตีความที่เปลี่ยนแปลงน้อยที่สุด
 {{OUTPUT_HYGIENE_RULES}}
 <<IF brand>>{{BRAND_BLOCK}}<<END>>
-ตอบ JSON เต็มก้อนตาม schema เดิมเท่านั้น
+ตอบ JSON แบบ partial object เท่านั้น ห้ามมีข้อความอื่นนอก JSON
 ```
 User:
 ```
-JSON ปัจจุบัน:
+JSON ปัจจุบัน (สำหรับอ้างอิงบริบทเท่านั้น — ห้ามคัดลอกส่วนที่ไม่ได้แก้กลับมา):
 {{current_kit_json}}
 
-คำสั่งแก้ไข (เฉพาะส่วน {{section_name}}): {{instruction}}
+คำสั่งแก้ไข (เฉพาะส่วน {{section_key}}): {{instruction}}
 ```
-Post-check (code, not model): diff non-target sections; if changed, restore originals from
-the previous version before saving. Save as new `generation_versions` row (undo = revert).
+Merge (code, not model): `merged = restrictToSection ? {...previous, [key]: patch[key]} : {...previous, ...patch}`.
+For single-section refine, code **only ever applies the one requested key** even if the model
+mistakenly returns extras — defense in depth on top of the patch design.
 
-### R.2 Refine-all — "ปรับทั้งหมดในครั้งเดียว"
+### R.3 Refine-all — "ปรับทั้งหมดในครั้งเดียว"
 
-Same as R.1 but **model = `smart`**, no section lock, and system line 2 becomes:
+Same as R.2 but **model = `smart`**, and system line 2 becomes:
 ```
 - ผู้ใช้จะสั่งแบบรวม ("ทำให้กระชับขึ้นทุกอัน") หรือเจาะจง ("ปรับ caption Facebook ให้สั้นลง",
-  "เปลี่ยน hashtag") — วิเคราะห์ว่าคำสั่งแตะส่วนไหนบ้าง แก้เฉพาะส่วนเหล่านั้น
+  "เปลี่ยน hashtag") — วิเคราะห์ว่าคำสั่งแตะส่วนไหนบ้าง (hooks / scripts / visual / hashtags)
 ```
+Merge: `merged = {...previous, ...patch}` — whatever subset of keys the model includes get
+applied; everything else is untouched by construction, not by model promise.
 UI placeholder text: `เช่น 'ทำให้กระชับขึ้นทุกอัน' หรือเจาะจง 'ปรับ caption Facebook ให้สั้นลง'`.
+
+Verified live (`scripts/eval-content-kit.mjs`, 2 independent runs, 20/20 assertions): a
+facebook-only instruction under refine-all now returns a patch containing only `{scripts:
+[...]}`, and hooks/visual/hashtags are byte-identical after merge.
 
 ---
 
@@ -682,8 +724,9 @@ these after wiring each prompt and eyeball outputs (they are judgment evals, not
    8 video shots forming a story, hashtags mix Thai/English, zero fabricated statistics.
 2. ContentKit + Brand (tone "กันเอง ขำๆ", pronoun "เฮีย") → captions audibly change voice;
    pronoun appears; banned words absent.
-3. Refine-all: "ปรับ caption Facebook ให้สั้นลง เหลือ 3 ย่อหน้า" → FB caption ≤3 paragraphs,
-   ALL other sections byte-identical (code-level diff check must pass).
+3. Refine-all: "ปรับ caption Facebook ให้สั้นลง เหลือ 3 ย่อหน้า" → FB caption shorter/~3
+   paragraphs (soft target — judgment call, not exact-match), patch contains only `scripts`,
+   ALL other sections byte-identical (guaranteed by the §R patch-merge, not a diff check).
 4. Image enhance: input "โปสเตอร์โปรโมชั่นร้านกาแฟ โทนอบอุ่น มีข้อความ 'ลด 50%'" thai_text_mode=on →
    English prompt containing "ลด 50%" in quotes + placement + "no other text" guard; off →
    NO Thai text, NO_TEXT_GUARD present.

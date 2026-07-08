@@ -233,7 +233,31 @@ export const brainstorm: PromptModule<BrainstormInput, z.infer<typeof Brainstorm
       .join("\n"),
 };
 
-// ---------- §R Refine ----------
+// ---------- §R Refine (v2 — patch-based) ----------
+// v1 asked the model to echo the FULL kit back with untouched sections copied
+// byte-for-byte. Live testing (2026-07-09) proved this unreliable: gemini-2.5-pro
+// corrupted an untouched `hashtags` array (mangled into one garbled merged string)
+// while refining an unrelated section. The fix is structural, not prompt-wording:
+// the model now returns ONLY the sections it is changing, as a partial object;
+// code merges the patch onto the previous kit. A section the model never returns
+// literally cannot be corrupted — no discipline required.
+export const ContentKitPatchSchema = z
+  .object({
+    hooks: ContentKitSchema.shape.hooks,
+    scripts: ContentKitSchema.shape.scripts,
+    visual: ContentKitSchema.shape.visual,
+    hashtags: ContentKitSchema.shape.hashtags,
+  })
+  .partial();
+export type ContentKitPatch = z.infer<typeof ContentKitPatchSchema>;
+
+const SECTION_TO_KEY = {
+  hook: "hooks",
+  script: "scripts",
+  visual: "visual",
+  hashtags: "hashtags",
+} as const;
+
 export interface RefineInput {
   current_kit_json: string; // JSON.stringify of latest ContentKit
   instruction: string;
@@ -241,28 +265,46 @@ export interface RefineInput {
   brand?: Brand;
 }
 
-export const refine: PromptModule<RefineInput, ContentKit> = {
-  id: "content.refine.v1",
+export const refine: PromptModule<RefineInput, ContentKitPatch> = {
+  id: "content.refine.v2",
   model: "fast", // route to "smart" when section_name is undefined (refine-all)
   temperature: 0.6,
-  schema: ContentKitSchema,
+  schema: ContentKitPatchSchema,
+  partialTopLevel: true, // top-level keys are genuinely optional — see toGeminiSchema
   system: (i) => {
     const scopeLine = i.section_name
-      ? `- แก้เฉพาะส่วน ${i.section_name} ตามคำสั่งผู้ใช้`
-      : `- ผู้ใช้จะสั่งแบบรวม ("ทำให้กระชับขึ้นทุกอัน") หรือเจาะจง ("ปรับ caption Facebook ให้สั้นลง", "เปลี่ยน hashtag") — วิเคราะห์ว่าคำสั่งแตะส่วนไหนบ้าง แก้เฉพาะส่วนเหล่านั้น`;
+      ? `- ผู้ใช้ระบุมาแล้วว่าต้องการแก้เฉพาะส่วน "${SECTION_TO_KEY[i.section_name]}" เท่านั้น`
+      : `- ผู้ใช้จะสั่งแบบรวม ("ทำให้กระชับขึ้นทุกอัน") หรือเจาะจง ("ปรับ caption Facebook ให้สั้นลง", "เปลี่ยน hashtag") — วิเคราะห์ว่าคำสั่งแตะส่วนไหนบ้าง (hooks / scripts / visual / hashtags)`;
     return [
-      `คุณคือบรรณาธิการคอนเทนต์ หน้าที่เดียวของคุณคือ "แก้ไขตามคำสั่ง" โดยแตะให้น้อยที่สุด`,
+      `คุณคือบรรณาธิการคอนเทนต์ หน้าที่เดียวของคุณคือ "แก้ไขตามคำสั่ง"`,
       scopeLine,
-      `- รักษาโครงสร้าง JSON schema เดิมเป๊ะ
-- ส่วนอื่นที่ไม่เกี่ยว: คืนค่าเดิมแบบตัวอักษรต่อตัวอักษร ห้ามแก้ ห้าม "ปรับปรุงเอง"
+      `- ตอบกลับเป็น JSON ที่มีเฉพาะ key ของส่วนที่คุณแก้ไขจริงเท่านั้น (hooks, scripts, visual, hashtags — เลือกเฉพาะที่เกี่ยว)
+- ห้ามใส่ key ของส่วนที่ไม่ได้แก้ไขลงในคำตอบเลย แม้แต่ส่วนเดียว — ระบบจะเก็บของเดิมไว้เองสำหรับ key ที่คุณไม่ได้ส่งมา
+- ถ้าแก้ "scripts" หรือ "hashtags" ต้องส่งทั้ง array กลับมาครบ (ทุก platform เดิม) ไม่ใช่แค่รายการที่เปลี่ยน
 - ถ้าคำสั่งกำกวม เลือกการตีความที่เปลี่ยนแปลงน้อยที่สุด`,
       OUTPUT_HYGIENE_RULES,
       i.brand ? brandBlock(i.brand) : null,
-      `ตอบ JSON เต็มก้อนตาม schema เดิมเท่านั้น`,
+      `ตอบ JSON แบบ partial object เท่านั้น ห้ามมีข้อความอื่นนอก JSON`,
     ]
       .filter(Boolean)
       .join("\n\n");
   },
   user: (i) =>
-    `JSON ปัจจุบัน:\n${i.current_kit_json}\n\nคำสั่งแก้ไข${i.section_name ? ` (เฉพาะส่วน ${i.section_name})` : ""}: ${i.instruction}`,
+    `JSON ปัจจุบัน (สำหรับอ้างอิงบริบทเท่านั้น — ห้ามคัดลอกส่วนที่ไม่ได้แก้กลับมา):\n${i.current_kit_json}\n\nคำสั่งแก้ไข${i.section_name ? ` (เฉพาะส่วน ${SECTION_TO_KEY[i.section_name]})` : ""}: ${i.instruction}`,
 };
+
+/** Merge a refine patch onto the previous kit. Keys absent from the patch are
+ * guaranteed untouched — by construction, not by model discipline. */
+export function applyContentKitPatch(
+  previous: ContentKit,
+  patch: ContentKitPatch,
+  restrictToSection?: "hook" | "script" | "visual" | "hashtags"
+): ContentKit {
+  if (restrictToSection) {
+    const key = SECTION_TO_KEY[restrictToSection];
+    // Defense in depth: even if the model ignored instructions and returned
+    // extra keys, a single-section refine can only ever change that one key.
+    return key in patch ? { ...previous, [key]: patch[key] } : previous;
+  }
+  return { ...previous, ...patch };
+}

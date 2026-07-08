@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { refine, ContentKitSchema, type ContentKit } from "@cs/prompts";
-import { run, enforceSectionLock, AiError } from "@cs/ai";
+import { refine, ContentKitSchema, applyContentKitPatch, type ContentKit } from "@cs/prompts";
+import { run, AiError } from "@cs/ai";
 
 export const maxDuration = 60;
-
-const SECTION_KEYS: (keyof ContentKit)[] = ["hooks", "scripts", "visual", "hashtags"];
-const SECTION_MAP: Record<string, keyof ContentKit> = {
-  hook: "hooks",
-  script: "scripts",
-  visual: "visual",
-  hashtags: "hashtags",
-};
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,13 +22,12 @@ export async function POST(req: NextRequest) {
       // refine-all routes to the smart tier (doc 02 §R.2)
       section ? {} : { modelOverride: "gemini-2.5-pro" }
     );
-    const locked = enforceSectionLock(
-      previous as unknown as Record<string, unknown>,
-      result.output as unknown as Record<string, unknown>,
-      section ? (SECTION_MAP[section] as string) : undefined,
-      SECTION_KEYS as string[]
-    );
-    return NextResponse.json({ kit: locked });
+    // Patch-based merge (doc 02 §R v2): untouched sections are guaranteed
+    // unchanged because the model never returns them, not because it echoed
+    // them correctly — see content-kit.ts for why v1's echo-back approach
+    // was replaced after live testing found it corrupted an untouched section.
+    const merged = applyContentKitPatch(previous, result.output, section);
+    return NextResponse.json({ kit: merged });
   } catch (e) {
     const msg = e instanceof AiError ? e.message : "ปรับไม่สำเร็จ ลองใหม่อีกครั้ง";
     return NextResponse.json({ error: msg }, { status: 500 });

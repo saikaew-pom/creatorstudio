@@ -39,7 +39,8 @@ export class AiError extends Error {
  * minItems/maxItems. Strip everything else (JSON-Schema-only keywords like
  * additionalProperties, $schema, $ref, definitions) that zod-to-json-schema emits.
  */
-function toGeminiSchema(schema: z.ZodType): unknown {
+function toGeminiSchema(schema: z.ZodType, opts: { requireAllTopLevel?: boolean } = {}): unknown {
+  const requireAllTopLevel = opts.requireAllTopLevel ?? true;
   const json = zodToJsonSchema(schema, { target: "openApi3", $refStrategy: "none" });
   const ALLOWED = new Set([
     "type", "format", "description", "nullable", "enum", "items", "properties",
@@ -49,7 +50,7 @@ function toGeminiSchema(schema: z.ZodType): unknown {
   // NB: `properties` and `required`/`enum` hold data (property names / literal values),
   // not nested schema nodes to filter by ALLOWED — they need dedicated handling below,
   // everything else is either a primitive or a nested schema node to recurse into.
-  function sanitize(node: unknown): unknown {
+  function sanitize(node: unknown, isRoot: boolean): unknown {
     if (!node || typeof node !== "object") return node;
     const src = node as Record<string, unknown>;
     const out: Record<string, unknown> = {};
@@ -58,24 +59,29 @@ function toGeminiSchema(schema: z.ZodType): unknown {
       if (k === "properties") {
         const props: Record<string, unknown> = {};
         for (const [propName, propSchema] of Object.entries(v as Record<string, unknown>)) {
-          props[propName] = sanitize(propSchema);
+          props[propName] = sanitize(propSchema, false);
         }
         out.properties = props;
       } else if (k === "items") {
-        out.items = sanitize(v);
+        out.items = sanitize(v, false);
       } else if (k === "required" || k === "enum") {
         out[k] = v; // arrays of primitive strings — leave as-is
       } else {
         out[k] = v; // primitives: type, format, description, nullable, min/maxItems, etc.
       }
     }
-    if (out.properties && out.required === undefined) {
-      // Gemini requires `required` to be present when properties exist for reliable output
+    // Gemini requires `required` to be present when properties exist for reliable
+    // output — BUT only default to "all keys required" when that's actually true.
+    // zod-to-json-schema omits `required` entirely (rather than emitting `[]`) for
+    // a fully-.partial() object, which would otherwise silently make us tell Gemini
+    // every key is mandatory — exactly backwards for a patch-shaped root schema
+    // (this previously caused refine's patch schema to always return all 4 keys).
+    if (out.properties && out.required === undefined && (!isRoot || requireAllTopLevel)) {
       out.required = Object.keys(out.properties as Record<string, unknown>);
     }
     return out;
   }
-  return sanitize(json);
+  return sanitize(json, true);
 }
 
 async function callGemini(
@@ -166,7 +172,9 @@ export async function run<I, O>(
   const system = mod.system(input);
   const user = mod.user(input);
   const t0 = Date.now();
-  const geminiSchema = toGeminiSchema(mod.schema as unknown as z.ZodType);
+  const geminiSchema = toGeminiSchema(mod.schema as unknown as z.ZodType, {
+    requireAllTopLevel: !mod.partialTopLevel,
+  });
   // Structured extraction doesn't need deep reasoning; skip "thinking" on the fast
   // tier for latency/cost, keep default (auto) reasoning on the smart tier for refine.
   const thinkingBudget = tier === "fast" ? 0 : undefined;
@@ -221,17 +229,3 @@ export async function run<I, O>(
   throw new AiError("unreachable", "schema");
 }
 
-/** Refine post-check (doc 02 §R.1): restore untouched sections byte-identically. */
-export function enforceSectionLock<T extends Record<string, unknown>>(
-  previous: T,
-  next: T,
-  targetSection: keyof T | undefined,
-  sectionKeys: (keyof T)[]
-): T {
-  if (!targetSection) return next; // refine-all: model decides scope
-  const out = { ...next };
-  for (const key of sectionKeys) {
-    if (key !== targetSection) out[key] = previous[key];
-  }
-  return out;
-}

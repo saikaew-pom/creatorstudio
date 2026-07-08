@@ -3,17 +3,26 @@
 AI-powered creator studio for the Thai market — two apps, one monorepo.
 **Full specification: [BLUEPRINT.md](BLUEPRINT.md) + [docs/](docs/)** (read before coding).
 
-## Status (auto-built overnight, 2026-07-08)
+## Status (2026-07-09)
 
 | Piece | State |
 |---|---|
 | Blueprint pack (7 docs) | ✅ complete |
-| `packages/prompts` — all prompt modules + zod schemas (doc 02) | ✅ typechecks |
-| `packages/ai` — Gemini router, JSON mode, schema repair, section lock | ✅ typechecks |
+| `packages/prompts` — all prompt modules + zod schemas (doc 02) | ✅ typechecks, live-verified |
+| `packages/ai` — Gemini router, real `responseSchema`, JSON repair, patch-merge refine | ✅ typechecks, live-verified |
 | `packages/db` — full Postgres schema + RLS + credit/quota RPCs | ✅ SQL ready (not yet applied) |
-| `apps/content` — dashboard + Content Studio (generate/hooks/refine/refine-all/brainstorm APIs + full result UI) | ✅ builds, UI verified |
+| `apps/content` — dashboard + Content Studio (generate/hooks/refine/refine-all/brainstorm APIs + full result UI) | ✅ builds, **live-verified end-to-end with real Gemini key** |
 | `apps/studio` — dashboard + editor steps 01–02 (script→typed segments, elements picker) | ✅ builds, UI verified |
 | Supabase wiring, image gen, video render pipeline, MCP | ⬜ next (docs/06 M1, M3, M5+) |
+
+**Live verification**: `scripts/eval-content-kit.mjs` runs doc-02 §QA evals against the real
+Gemini API — 20/20 passing across two independent runs, confirming: full content kit generates
+correctly first try, brand voice changes tone/pronoun and respects banned words, and refine
+(both single-section and refine-all) leaves untouched sections byte-identical **by
+construction** (patch-based merge — see docs/02-prompt-engine.md §R for why the original
+"echo the full kit back" design was replaced after live testing caught real corruption).
+
+Run it yourself: `set -a && source .env && set +a && npx tsx scripts/eval-content-kit.mjs`
 
 ## Run it
 
@@ -29,9 +38,7 @@ Without `GEMINI_API_KEY` the UIs work but generation returns a Thai error messag
 
 ## Next steps (in order — docs/06-build-plan.md)
 
-1. **Smoke-test generation**: add `GEMINI_API_KEY`, run `/studio`, generate a kit, try
-   refine-all — compare against doc 02 §QA evals 1–3.
-2. **M1**: create a Supabase project, apply `packages/db/migrations/0001_init.sql`, wire auth
+1. **M1**: create a Supabase project, apply `packages/db/migrations/0001_init.sql`, wire auth
    + persistence at the `TODO(M1)` markers in `apps/content/app/api/*`.
-3. **M3–M8**: follow the build plan; hand milestones to Opus/Sonnet with the BLUEPRINT §5
+2. **M3–M8**: follow the build plan; hand milestones to Opus/Sonnet with the BLUEPRINT §5
    handover protocol.

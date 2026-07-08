@@ -111,6 +111,10 @@ export interface PromptModule<I, O> {
   system: (input: I) => string;
   user: (input: I) => string;
   schema: z.ZodType<O>;
+  /** True for patch-shaped schemas (top-level keys are genuinely optional —
+   * e.g. refine's ContentKitPatchSchema) so the Gemini responseSchema
+   * converter doesn't force all top-level keys into `required`. */
+  partialTopLevel?: boolean;
 }
 
 export const todayTh = (d = new Date()): string =>
