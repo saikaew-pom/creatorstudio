@@ -11,9 +11,17 @@ AI-powered creator studio for the Thai market — two apps, one monorepo.
 | `packages/prompts` — all prompt modules + zod schemas (doc 02) | ✅ typechecks, live-verified |
 | `packages/ai` — Gemini router, real `responseSchema`, JSON repair, patch-merge refine | ✅ typechecks, live-verified |
 | `packages/db` — full Postgres schema + RLS + credit/quota RPCs + client layer + auth | ✅ **migration + ledger RPCs verified against real Postgres (PGlite), 28/28** |
-| `apps/content` — dashboard + Content Studio + auth (login/callback/middleware) + /credits + quota-gated persistence | ✅ builds, **content gen live-verified with real Gemini key** |
+| `apps/content` — dashboard + Content Studio + auth (login/callback/middleware) + /credits + quota-gated persistence | ✅ **M1 live-verified end-to-end on hosted Supabase** (see below) |
 | `apps/studio` — dashboard + editor steps 01–02 (script→typed segments, elements picker) | ✅ builds, UI verified |
 | Image gen, video render pipeline, MCP, payments | ⬜ next (docs/06 M3, M5+; payments deferred) |
+
+**M1 live-verified (2026-07-08, hosted Supabase):** signed up a confirmed user → signup
+trigger auto-created the profile + granted 20 monthly credits → signed in through the browser
+(middleware/session/cookies) → `/credits` rendered the real 20 from the ledger → generated a
+content kit → it persisted to `generations` (`content.kit.v1`, gemini-2.5-flash) and the daily
+quota row incremented → RLS confirmed to block anon reads on `generations` and `profiles` →
+test user deleted, FK cascade cleaned up every child row. Payments remain a disabled
+"เร็วๆ นี้" button (sensitive; needs real keys).
 
 ### One-time Supabase setup (required to enable auth + persistence + credits)
 
