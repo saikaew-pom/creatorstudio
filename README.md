@@ -10,28 +10,43 @@ AI-powered creator studio for the Thai market — two apps, one monorepo.
 | Blueprint pack (7 docs) | ✅ complete |
 | `packages/prompts` — all prompt modules + zod schemas (doc 02) | ✅ typechecks, live-verified |
 | `packages/ai` — Gemini router, real `responseSchema`, JSON repair, patch-merge refine | ✅ typechecks, live-verified |
-| `packages/db` — full Postgres schema + RLS + credit/quota RPCs + client layer + auth | ✅ **migration + ledger RPCs verified against real Postgres (PGlite), 28/28** |
-| `apps/content` — dashboard + Content Studio + auth (login/callback/middleware) + /credits + quota-gated persistence | ✅ **M1 live-verified end-to-end on hosted Supabase** (see below) |
+| `packages/db` — full Postgres schema + RLS + credit/quota/refund RPCs + storage + client layer + auth | ✅ **verified against real Postgres (PGlite) with RLS actually enforced, 30/30** |
+| `apps/content` — Content Studio + Image Studio + auth + /credits + /history + /collections + /calendar + quota-gated persistence | ✅ **M1 + M3 live-verified end-to-end on hosted Supabase** (see below) |
 | `apps/studio` — dashboard + editor steps 01–02 (script→typed segments, elements picker) | ✅ builds, UI verified |
-| Image gen, video render pipeline, MCP, payments | ⬜ next (docs/06 M3, M5+; payments deferred) |
+| Video render pipeline, MCP, payments | ⬜ next (docs/06 M5+; payments deferred) |
 
 **M1 live-verified (2026-07-08, hosted Supabase):** signed up a confirmed user → signup
 trigger auto-created the profile + granted 20 monthly credits → signed in through the browser
 (middleware/session/cookies) → `/credits` rendered the real 20 from the ledger → generated a
-content kit → it persisted to `generations` (`content.kit.v1`, gemini-2.5-flash) and the daily
-quota row incremented → RLS confirmed to block anon reads on `generations` and `profiles` →
-test user deleted, FK cascade cleaned up every child row. Payments remain a disabled
-"เร็วๆ นี้" button (sensitive; needs real keys).
+content kit → it persisted to `generations` and the daily quota row incremented → RLS confirmed
+to block anon reads → test user deleted, FK cascade cleaned up every child row.
+
+**M3 live-verified (2026-07-09, hosted Supabase):** image models chosen by testing the real API
+(standard = `gemini-2.5-flash-image`, pro = `gemini-3.1-flash-image` for Thai-in-image). Signed
+in → generated a Thai-text poster (pro tier) → image rendered with correct legible Thai text →
+uploaded to Supabase Storage + served via public URL → credits debited 20→15 → persisted to
+`generations` (model/asset_path/prompt_id/credits all correct) → appeared in `/history` → test
+user + storage object cleaned up. Two RLS bugs found live and fixed (storage upload, credit
+refund) — see migration 0003 and the git log. Payments remain a disabled "เร็วๆ นี้" button.
+
+**Known gaps (non-blocking, for later):**
+- Storage objects are NOT cascade-deleted when a user/generation is deleted (Supabase Storage
+  doesn't FK-cascade). Needs a cleanup trigger or scheduled sweep before production.
+- `generations` bucket is public with UUID-unguessable paths — fine for AI marketing images, but
+  brand-asset uploads (personal photos, M4) should move to private storage + signed URLs.
 
 ### One-time Supabase setup (required to enable auth + persistence + credits)
 
 1. Fill `.env` with your project's `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
    `SUPABASE_SERVICE_ROLE_KEY` (Supabase dashboard → Project Settings → API).
 2. Apply the schema: open your project's **SQL Editor** and run
-   `packages/db/migrations/_apply_all.generated.sql` (0001 + 0002 combined; regenerate any time
-   with `cat packages/db/migrations/000*.sql > ...`). This is the standard hosted-Supabase DDL
-   path — PostgREST can't run raw SQL, so it's a dashboard paste.
-3. (For Google login) enable the Google provider in Auth → Providers and add
+   `packages/db/migrations/_apply_all.generated.sql` (0001 + 0002 + 0003 combined; regenerate any
+   time with `cat packages/db/migrations/000*.sql > packages/db/migrations/_apply_all.generated.sql`).
+   This is the standard hosted-Supabase DDL path — PostgREST can't run raw SQL, so it's a
+   dashboard paste.
+3. Create the storage bucket for generated images (once):
+   `curl -X POST "$URL/storage/v1/bucket" -H "authorization: Bearer $SERVICE_ROLE" -H "apikey: $SERVICE_ROLE" -H "content-type: application/json" -d '{"id":"generations","name":"generations","public":true,"file_size_limit":10485760,"allowed_mime_types":["image/png","image/jpeg","image/webp"]}'`
+4. (For Google login) enable the Google provider in Auth → Providers and add
    `<app-url>/auth/callback` as a redirect URL.
 
 Until step 2 is done the app runs in **degraded mode**: UI + AI generation work, but there's no
