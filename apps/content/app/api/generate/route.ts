@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { contentKit, type ContentKitInput } from "@cs/prompts";
 import { run, AiError } from "@cs/ai";
-import { insertGeneration } from "@cs/db";
+import { insertGeneration, getBrand, getStyle } from "@cs/db";
 import { gateGeneration, gateError } from "../../../lib/gate";
 
 export const maxDuration = 60;
 
+interface GenerateBody extends Omit<ContentKitInput, "brand" | "style"> {
+  brandId?: string;
+  styleId?: string;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const input = (await req.json()) as ContentKitInput;
-    if (!input.topic?.trim() || !input.platforms?.length) {
+    const body = (await req.json()) as GenerateBody;
+    if (!body.topic?.trim() || !body.platforms?.length) {
       return NextResponse.json({ error: "กรอกหัวข้อและเลือกแพลตฟอร์มก่อน" }, { status: 400 });
     }
 
@@ -17,6 +22,26 @@ export async function POST(req: NextRequest) {
     const gate = await gateGeneration("content_studio");
     const gateErr = gateError(gate);
     if (gateErr) return NextResponse.json(gateErr.body, { status: gateErr.status });
+
+    // Load brand/style server-side by id (RLS scopes them to the owner) — the client
+    // sends only ids, never the profile objects, so they can't be tampered with.
+    const input: ContentKitInput = {
+      topic: body.topic,
+      niche: body.niche,
+      platforms: body.platforms,
+      template: body.template,
+      goal: body.goal,
+    };
+    if (gate.kind === "ok") {
+      if (body.brandId) {
+        const brand = await getBrand(gate.db, body.brandId);
+        if (brand) input.brand = brand.data;
+      }
+      if (body.styleId) {
+        const style = await getStyle(gate.db, body.styleId);
+        if (style) input.style = style.profile;
+      }
+    }
 
     const result = await run(contentKit, input);
 

@@ -8,12 +8,21 @@ export interface BrandFillInput {
 }
 
 export const brandFill: PromptModule<BrandFillInput, Brand> = {
-  id: "brand.fill.v1",
+  id: "brand.fill.v2",
   model: "smart",
   temperature: 0.4,
   schema: BrandSchema,
   system: () => `คุณคือที่ปรึกษาแบรนด์ อ่านเรื่องเล่าธุรกิจภาษาไทยธรรมดา แล้วสกัดเป็น "โปรไฟล์เสียงแบรนด์" ที่ระบบจะใช้กำกับการเขียนคอนเทนต์ทุกชิ้น
-กติกา: สกัดจากสิ่งที่ผู้ใช้เล่าเท่านั้น จุดที่ไม่รู้ให้เดาแบบอนุรักษ์นิยมที่สุดจาก niche และทำเครื่องหมาย confidence เพื่อให้ผู้ใช้ตรวจในขั้นถัดไป ห้ามแต่งข้อมูลธุรกิจที่ไม่ได้บอก
+กติกา: สกัดจากสิ่งที่ผู้ใช้เล่าเท่านั้น จุดที่ไม่รู้ให้เดาแบบอนุรักษ์นิยมที่สุดจาก niche ห้ามแต่งข้อมูลธุรกิจที่ไม่ได้บอก
+
+## confidence (สำคัญมาก — ห้ามเว้นว่าง)
+ต้องใส่ confidence เป็น object ที่มี key ครบทุก field ที่คุณกรอก โดยระบุว่าแต่ละ field มาจากไหน:
+- "from_user" = ผู้ใช้บอกมาตรงๆ ในเรื่องเล่า
+- "guessed" = คุณเดา/อนุมานเอง (ผู้ใช้ไม่ได้บอก) เพื่อให้ผู้ใช้ไปตรวจแก้ในขั้นถัดไป
+ตัวอย่าง: { "name": "from_user", "tone": "from_user", "words_use": "guessed", "hashtags": "guessed", "audience": "from_user", ... }
+key ที่ต้องมีใน confidence: name, business, audience, tone, pronoun, words_use, words_avoid, emoji_policy, hashtags, sample_lines
+sample_lines คือประโยคตัวอย่างที่คุณแต่งให้ดูเป็นแนว จึงเป็น "guessed" เสมอ
+
 ตอบ JSON เท่านั้น`,
   user: (i) => `เรื่องเล่าจากเจ้าของ: ${i.free_text_story}`,
 };

@@ -112,6 +112,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@cs/prompts':
+        specifier: workspace:*
+        version: link:../prompts
       '@supabase/ssr':
         specifier: ^0.5.2
         version: 0.5.2(@supabase/supabase-js@2.110.1)

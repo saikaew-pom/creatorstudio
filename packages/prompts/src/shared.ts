@@ -12,6 +12,24 @@ export type ModelTier =
 export type Platform = "facebook" | "instagram" | "tiktok" | "youtube" | "tts";
 
 // ---------- Brand & Style types ----------
+// confidence uses an explicit object (one key per brand field) rather than a free
+// z.record(): a record converts to a property-less object in Gemini's responseSchema,
+// leaving the model no structural cue for which keys to emit — verified live that it
+// then returns `{}`. Enumerating the keys makes the model reliably fill each one.
+const Conf = z.enum(["from_user", "guessed"]);
+export const BrandConfidenceSchema = z.object({
+  name: Conf,
+  business: Conf,
+  audience: Conf,
+  tone: Conf,
+  pronoun: Conf,
+  words_use: Conf,
+  words_avoid: Conf,
+  emoji_policy: Conf,
+  hashtags: Conf,
+  sample_lines: Conf,
+});
+
 export const BrandSchema = z.object({
   name: z.string(),
   business: z.string(),
@@ -23,9 +41,10 @@ export const BrandSchema = z.object({
   emoji_policy: z.enum(["none", "light", "medium", "heavy"]),
   hashtags: z.array(z.string()).max(8),
   sample_lines: z.array(z.string()).length(3),
-  confidence: z.record(z.string(), z.enum(["from_user", "guessed"])),
+  confidence: BrandConfidenceSchema,
 });
 export type Brand = z.infer<typeof BrandSchema>;
+export type BrandFieldKey = keyof z.infer<typeof BrandConfidenceSchema>;
 
 export const StyleProfileSchema = z.object({
   name: z.string(),

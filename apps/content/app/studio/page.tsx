@@ -1,6 +1,7 @@
 "use client";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { browserClient, isSupabaseConfigured, type BrandRow, type StyleRow } from "@cs/db";
 import type { ContentKit, Platform, TemplateChip } from "@cs/prompts";
 
 const TEMPLATES: { key: TemplateChip; label: string }[] = [
@@ -51,6 +52,20 @@ function StudioInner() {
   const [coverLoading, setCoverLoading] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
   const [coverImage, setCoverImage] = useState<{ url: string; creditsSpent: number } | null>(null);
+  const [brands, setBrands] = useState<BrandRow[]>([]);
+  const [stylesList, setStylesList] = useState<StyleRow[]>([]);
+  const [brandId, setBrandId] = useState("");
+  const [styleId, setStyleId] = useState("");
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const db = browserClient();
+    db.auth.getUser().then(({ data }) => {
+      if (!data.user) return;
+      db.from("brands").select("*").then(({ data: b }) => setBrands((b ?? []) as BrandRow[]));
+      db.from("styles").select("*").then(({ data: s }) => setStylesList((s ?? []) as StyleRow[]));
+    });
+  }, []);
 
   async function generate() {
     setLoading("กำลังสร้างชุดคอนเทนต์… (hook · สคริปต์ · visual · แฮชแท็ก)");
@@ -59,7 +74,7 @@ function StudioInner() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ topic, niche: niche || undefined, template, platforms }),
+        body: JSON.stringify({ topic, niche: niche || undefined, template, platforms, brandId: brandId || undefined, styleId: styleId || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -177,6 +192,24 @@ function StudioInner() {
             </button>
           ))}
         </div>
+        {(brands.length > 0 || stylesList.length > 0) && (
+          <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div className="label">🎨 Brand Voice</div>
+              <select className="input" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
+                <option value="">ไม่ใช้ Brand Voice</option>
+                {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div className="label">✍️ Style</div>
+              <select className="input" value={styleId} onChange={(e) => setStyleId(e.target.value)}>
+                <option value="">ไม่ใช้ Style</option>
+                {stylesList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: 16 }}>
           <button className="btn primary" style={{ width: "100%", justifyContent: "center" }}
             disabled={!topic.trim() || !platforms.length || !!loading} onClick={generate}>
