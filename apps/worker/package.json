@@ -12,7 +12,9 @@
     "@cs/ai": "workspace:*",
     "@cs/db": "workspace:*",
     "@cs/prompts": "workspace:*",
-    "@supabase/supabase-js": "^2.45.4"
+    "@resvg/resvg-js": "^2.6.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "@cs/captions": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22",
