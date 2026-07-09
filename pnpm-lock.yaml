@@ -59,9 +59,18 @@ importers:
       '@cs/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@cs/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@cs/prompts':
         specifier: workspace:*
         version: link:../../packages/prompts
+      '@supabase/ssr':
+        specifier: ^0.5.2
+        version: 0.5.2(@supabase/supabase-js@2.110.1)
+      '@supabase/supabase-js':
+        specifier: ^2.45.4
+        version: 2.110.1
       next:
         specifier: ^14.2.15
         version: 14.2.35(react-dom@18.3.1(react@18.3.1))(react@18.3.1)

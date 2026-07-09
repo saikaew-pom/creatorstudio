@@ -21,6 +21,7 @@ const migDir = path.resolve(__dirname, "../migrations");
 const migration = readFileSync(path.join(migDir, "0001_init.sql"), "utf8");
 const migration2 = readFileSync(path.join(migDir, "0002_profile_bootstrap.sql"), "utf8");
 const migration3 = readFileSync(path.join(migDir, "0003_refund_rpc.sql"), "utf8");
+const migration4 = readFileSync(path.join(migDir, "0004_caption_broll_unique.sql"), "utf8");
 
 let pass = 0;
 let fail = 0;
@@ -99,7 +100,8 @@ try {
   await db.exec(migration);
   await db.exec(migration2);
   await db.exec(migration3);
-  check("migrations 0001 + 0002 + 0003 apply cleanly against real Postgres", true);
+  await db.exec(migration4);
+  check("migrations 0001–0004 apply cleanly against real Postgres", true);
 } catch (e) {
   check(`migrations apply cleanly — ERROR: ${(e as Error).message}`, false);
   console.log(`\n${pass} passed, ${fail} failed\n`);
@@ -217,6 +219,20 @@ await db.exec(`select increment_template_usage('roastmaster-pro')`);
 await db.exec(`select increment_template_usage('roastmaster-pro')`);
 check("usage_count incremented to 2",
   (await scalar<number>(`select usage_count as v from templates where slug='roastmaster-pro'`)) === 2);
+
+// ---- captions upsert (0004): onConflict=project_id works, one row per project ----
+console.log("\n== captions upsert (0004 unique constraint) ==");
+await db.exec(`insert into projects (id, user_id, name) values
+  ('99999999-9999-9999-9999-999999999999', '${USER_A}', 'p')`);
+const capUpsert = `insert into captions (project_id, cards, style) values
+  ('99999999-9999-9999-9999-999999999999', '[{"idx":0}]', '{}')
+  on conflict (project_id) do update set cards = excluded.cards`;
+await db.exec(capUpsert);
+await db.exec(capUpsert.replace('[{"idx":0}]', '[{"idx":0},{"idx":1}]')); // second upsert = update, not dupe
+check("captions upsert on project_id keeps exactly one row",
+  (await scalar<number>(`select count(*)::int as v from captions where project_id='99999999-9999-9999-9999-999999999999'`)) === 1);
+check("captions upsert updated the cards (2 now)",
+  (await scalar<number>(`select jsonb_array_length(cards) as v from captions where project_id='99999999-9999-9999-9999-999999999999'`)) === 2);
 
 // ---- RLS policies exist on core owner tables ----
 console.log("\n== RLS present on owner tables ==");

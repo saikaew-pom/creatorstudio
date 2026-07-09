@@ -28,3 +28,26 @@ export async function uploadGeneratedImage(
 export function publicImageUrl(db: SupabaseClient, path: string): string {
   return db.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 }
+
+const RENDERS_BUCKET = "renders";
+
+/** Upload a rendered video. Path: `${userId}/${projectId}/base.mp4`. Public bucket. */
+export async function uploadRender(
+  db: SupabaseClient,
+  userId: string,
+  projectId: string,
+  bytes: Buffer,
+  kind: "base" | "final" = "base"
+): Promise<string> {
+  const path = `${userId}/${projectId}/${kind}.mp4`;
+  const { error } = await db.storage.from(RENDERS_BUCKET).upload(path, bytes, {
+    contentType: "video/mp4",
+    upsert: true,
+  });
+  if (error) throw error;
+  return path;
+}
+
+export function publicRenderUrl(db: SupabaseClient, path: string): string {
+  return db.storage.from(RENDERS_BUCKET).getPublicUrl(path).data.publicUrl;
+}

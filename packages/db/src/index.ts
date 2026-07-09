@@ -5,6 +5,7 @@ export * from "./generations";
 export * from "./storage";
 export * from "./brands";
 export * from "./templates";
+export * from "./projects";
 
 /** Daily free-quota limits per plan (doc 01 §9). Enforced via tryConsumeDailyUse. */
 export const DAILY_LIMITS: Record<string, number> = {
