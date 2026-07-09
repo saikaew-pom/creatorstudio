@@ -12,8 +12,30 @@ AI-powered creator studio for the Thai market — two apps, one monorepo.
 | `packages/ai` — Gemini router, real `responseSchema`, JSON repair, patch-merge refine | ✅ typechecks, live-verified |
 | `packages/db` — full Postgres schema + RLS + credit/quota/refund RPCs + storage + client layer + auth | ✅ **verified against real Postgres (PGlite) with RLS actually enforced, 30/30** |
 | `apps/content` — Content/Image/Viral Studio + Brand Voice + Style Cloner + auth + /credits + /history + /collections + /calendar | ✅ **M1 + M3 + M4-core live-verified on hosted Supabase** (see below) |
-| `apps/studio` — dashboard + editor steps 01–02 (script→typed segments, elements picker) | ✅ builds, UI verified |
-| Video render pipeline, MCP, payments | ⬜ next (docs/06 M5+; payments deferred) |
+| `apps/studio` — dashboard + editor (script→segments→elements→**render**) + auth | ✅ **M5 render loop live-verified** (see below) |
+| `apps/worker` — preview-render pipeline + job worker (TTS→B-roll→ffmpeg→mp4) | ✅ **produces real mp4, verified end-to-end** |
+| Caption studio (M6), export, MCP, payments | ⬜ next (payments deferred) |
+
+**M5 live-verified (2026-07-09, hosted Supabase):** all tools verified live first (ffmpeg 8.1,
+Gemini TTS for Thai, Gemini images). Ran the real worker against a real queued job:
+enqueue → `render_jobs` → worker → per-segment TTS → segment-timed caption cards → B-roll
+keywords + AI Ken-Burns clips → ffmpeg assemble → **base.mp4 (1080×1920 H.264 + AAC, real
+−16dB voice) uploaded to the `renders` bucket** → captions saved → project rendered → minutes
+charged → notification. Also verified through the **studio UI**: signed in → editor → render
+button → `POST /api/render` 200 → status polling → worker completed → video in storage +
+notification. Two bugs caught live and fixed: captions silently saving zero cards (migration
+0004 unique constraint + `saveCaptions` now throws on error — same swallowed-error class as the
+M3 refund bug), and a transient TTS blip correctly failing the job (not a silent success).
+Frame-by-frame inspection caught the image model emitting contact-sheets for "b-roll" prompts —
+fixed to demand a single photo. Verified pieces: worker one-shot (`WORKER_ONCE=1`), migration
+test 32/32, `render-once` produces an inspectable mp4.
+
+**Known M5 gaps (non-blocking):** editor polling doesn't survive a tab reload yet (needs jobId
+persistence / the dashboard "render done" reconnect via the notification that already fires);
+B-roll uses AI images (Pexels/Pixabay stock is the intended free default — wired, needs the
+user's key); captions are segment-level (word-level Whisper karaoke is M6); music library +
+ducking is wired in ffmpeg but not hooked to a track picker; the worker runs on-demand here
+(deploy as a persistent Railway/Fly process for production).
 
 **M4-core live-verified (2026-07-09, hosted Supabase):** created a brand via the wizard
 (told a Thai story → AI extracted name/audience/tone/pronoun, flagged 4 fields as guessed →
