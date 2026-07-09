@@ -51,3 +51,27 @@ export async function uploadRender(
 export function publicRenderUrl(db: SupabaseClient, path: string): string {
   return db.storage.from(RENDERS_BUCKET).getPublicUrl(path).data.publicUrl;
 }
+
+const UPLOADS_BUCKET = "uploads";
+
+/** Upload user footage to the PRIVATE uploads bucket. Path: `${userId}/${projectId}/source.<ext>`. */
+export async function uploadSourceClip(
+  db: SupabaseClient,
+  userId: string,
+  projectId: string,
+  bytes: Buffer,
+  ext: string,
+  contentType: string
+): Promise<string> {
+  const path = `${userId}/${projectId}/source.${ext}`;
+  const { error } = await db.storage.from(UPLOADS_BUCKET).upload(path, bytes, { contentType, upsert: true });
+  if (error) throw error;
+  return path;
+}
+
+/** Download from the private uploads bucket (worker uses the service-role client). */
+export async function downloadUpload(admin: SupabaseClient, path: string): Promise<Buffer> {
+  const { data, error } = await admin.storage.from(UPLOADS_BUCKET).download(path);
+  if (error) throw error;
+  return Buffer.from(await data.arrayBuffer());
+}

@@ -32,6 +32,8 @@ function fmt(s: number): string {
 
 export default function VideoEditor() {
   const [step, setStep] = useState<Step>(1);
+  const [mode, setMode] = useState<"script" | "upload">("script");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [script, setScript] = useState("");
   const [voice, setVoice] = useState("Aoede");
   const [mood, setMood] = useState(MOODS[0]);
@@ -51,44 +53,61 @@ export default function VideoEditor() {
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
+  // Poll a job to completion, then open the caption studio (shared by script + upload).
+  function pollJob(jobId: string, projId: string) {
+    setProjectId(projId);
+    pollRef.current = setInterval(async () => {
+      const s = await fetch(`/api/render?jobId=${jobId}`).then((r) => r.json());
+      setRenderPct(s.progress ?? 0);
+      setRenderStep(s.step_label ?? "กำลังทำงาน…");
+      if (s.status === "done") {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setRendering(false);
+        setRenderStep(null);
+        const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        if (base && s.result_path) setVideoUrl(`${base}/storage/v1/object/public/renders/${s.result_path}`);
+        if (isSupabaseConfigured() && projId) {
+          const { data: cap } = await browserClient().from("captions").select("cards").eq("project_id", projId).maybeSingle();
+          setCaptionCards(((cap?.cards as CaptionCard[]) ?? []));
+        }
+      } else if (s.status === "failed") {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setRendering(false);
+        setRenderError(s.error || "เรนเดอร์ไม่สำเร็จ");
+      }
+    }, 3000);
+  }
+
   async function startRender() {
-    setRendering(true);
-    setRenderError(null);
-    setVideoUrl(null);
-    setRenderPct(0);
+    setRendering(true); setRenderError(null); setVideoUrl(null); setRenderPct(0);
     setRenderStep("กำลังเข้าคิว…");
     try {
       const res = await fetch("/api/render", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
+        method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ script, voice, brollTier: "ai" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setProjectId(data.projectId);
-      // Poll job status until done/failed.
-      pollRef.current = setInterval(async () => {
-        const s = await fetch(`/api/render?jobId=${data.jobId}`).then((r) => r.json());
-        setRenderPct(s.progress ?? 0);
-        setRenderStep(s.step_label ?? "กำลังทำงาน…");
-        if (s.status === "done") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setRendering(false);
-          setRenderStep(null);
-          // Public render URL (bucket is public; path = user/project/base.mp4).
-          const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          if (base && s.result_path) setVideoUrl(`${base}/storage/v1/object/public/renders/${s.result_path}`);
-          // Load the caption cards the worker saved, then open the caption studio.
-          if (isSupabaseConfigured() && data.projectId) {
-            const { data: cap } = await browserClient().from("captions").select("cards").eq("project_id", data.projectId).maybeSingle();
-            setCaptionCards(((cap?.cards as CaptionCard[]) ?? []));
-          }
-        } else if (s.status === "failed") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setRendering(false);
-          setRenderError(s.error || "เรนเดอร์ไม่สำเร็จ");
-        }
-      }, 3000);
+      pollJob(data.jobId, data.projectId);
+    } catch (e) {
+      setRendering(false);
+      setRenderError((e as Error).message);
+    }
+  }
+
+  async function startUpload() {
+    if (!uploadFile) return;
+    setStep(2); // jump straight to processing view
+    setRendering(true); setRenderError(null); setVideoUrl(null); setRenderPct(0);
+    setRenderStep("กำลังอัปโหลดคลิป…");
+    try {
+      const fd = new FormData();
+      fd.append("file", uploadFile);
+      fd.append("name", uploadFile.name);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      pollJob(data.jobId, data.projectId);
     } catch (e) {
       setRendering(false);
       setRenderError((e as Error).message);
@@ -107,6 +126,27 @@ export default function VideoEditor() {
       </div>
 
       {step === 1 && (
+        <>
+        <div className="chip-row" style={{ marginBottom: 12 }}>
+          <button className={`chip ${mode === "script" ? "on" : ""}`} onClick={() => setMode("script")}>✍️ พิมพ์สคริปต์</button>
+          <button className={`chip ${mode === "upload" ? "on" : ""}`} onClick={() => setMode("upload")}>🎬 ใช้คลิปที่ถ่ายเอง</button>
+        </div>
+
+        {mode === "upload" && (
+          <div className="card">
+            <h3>อัปคลิปแนวตั้งของคุณ</h3>
+            <p className="dim">ระบบจะถอดเสียงเป็นซับไทยให้อัตโนมัติ · เก็บเสียงต้นฉบับต่อเนื่อง · แนวตั้ง 9:16 · ไฟล์ ≤ 50MB</p>
+            <input type="file" accept="video/mp4,video/quicktime,video/webm"
+              onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
+            {uploadFile && <p className="dim" style={{ marginTop: 8 }}>เลือกแล้ว: {uploadFile.name} ({(uploadFile.size / 1024 / 1024).toFixed(1)}MB)</p>}
+            <button className="btn primary" style={{ marginTop: 12 }} disabled={!uploadFile || rendering} onClick={startUpload}>
+              อัปโหลด + ถอดเสียงเป็นซับ →
+            </button>
+            {renderError && <p style={{ color: "var(--danger)" }}>{renderError}</p>}
+          </div>
+        )}
+
+        {mode === "script" && (
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
           <div className="card">
             <h3>สคริปต์ของคุณ</h3>
@@ -143,9 +183,20 @@ export default function VideoEditor() {
             </button>
           </div>
         </div>
+        )}
+        </>
       )}
 
-      {step === 2 && (
+      {/* Upload mode: step 2 is just a processing view (transcribe runs in the worker). */}
+      {step === 2 && mode === "upload" && !videoUrl && (
+        <div className="card">
+          <h3>{rendering ? "กำลังประมวลผลคลิป…" : renderError ? "เกิดข้อผิดพลาด" : "เสร็จแล้ว"}</h3>
+          {rendering && <p className="dim"><span className="spin" /> {renderStep} {renderPct}%</p>}
+          {renderError && <p style={{ color: "var(--danger)" }}>{renderError}</p>}
+        </div>
+      )}
+
+      {step === 2 && mode === "script" && (
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
           <div>
             <div className="card">
