@@ -9,6 +9,6 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@cs/prompts", "@cs/ai", "@cs/db"],
+  transpilePackages: ["@cs/prompts", "@cs/ai", "@cs/db", "@cs/captions"],
 };
 export default nextConfig;

@@ -59,6 +59,9 @@ importers:
       '@cs/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@cs/captions':
+        specifier: workspace:*
+        version: link:../../packages/captions
       '@cs/db':
         specifier: workspace:*
         version: link:../../packages/db

@@ -4,6 +4,7 @@
 // serverless — renders are minutes-long. Run: pnpm --filter @cs/worker worker
 import { adminClient, getProject, type RenderJobRow } from "@cs/db";
 import { processJob } from "./process-job";
+import { processExport } from "./process-export";
 
 const POLL_MS = 4000;
 const apiKey = process.env.GEMINI_API_KEY;
@@ -12,17 +13,18 @@ if (!apiKey) { console.error("GEMINI_API_KEY missing"); process.exit(1); }
 const admin = adminClient();
 
 async function tick(): Promise<void> {
+  // Both kinds handled; preview_render first (exports are cheap/fast in comparison).
   const { data: jobs } = await admin
     .from("render_jobs")
     .select("*")
     .eq("status", "queued")
-    .eq("kind", "preview_render")
+    .order("kind", { ascending: false }) // preview_render before export
     .order("created_at", { ascending: true })
     .limit(1);
   const job = jobs?.[0] as RenderJobRow | undefined;
   if (!job) return;
 
-  console.log(`[worker] picked job ${job.id} (project ${job.project_id})`);
+  console.log(`[worker] picked ${job.kind} ${job.id} (project ${job.project_id})`);
   // Claim it immediately so a second worker won't double-process.
   await admin.from("render_jobs").update({ status: "running" }).eq("id", job.id);
 
@@ -30,10 +32,11 @@ async function tick(): Promise<void> {
   if (!project) { await admin.from("render_jobs").update({ status: "failed", error: "project not found" }).eq("id", job.id); return; }
 
   try {
-    await processJob(admin, job, project, apiKey!);
-    console.log(`[worker] job ${job.id} done`);
+    if (job.kind === "export") await processExport(admin, job, project);
+    else await processJob(admin, job, project, apiKey!);
+    console.log(`[worker] ${job.kind} ${job.id} done`);
   } catch (e) {
-    console.error(`[worker] job ${job.id} failed:`, (e as Error).message);
+    console.error(`[worker] ${job.kind} ${job.id} failed:`, (e as Error).message);
   }
 }
 

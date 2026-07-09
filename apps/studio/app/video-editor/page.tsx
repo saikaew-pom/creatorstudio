@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { splitScript, countThaiWords } from "@cs/prompts";
+import { browserClient, isSupabaseConfigured } from "@cs/db";
+import type { CaptionCard } from "@cs/captions";
+import { CaptionStudio } from "./CaptionStudio";
 
 type Step = 1 | 2;
 
@@ -38,6 +41,8 @@ export default function VideoEditor() {
   const [renderPct, setRenderPct] = useState(0);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [captionCards, setCaptionCards] = useState<CaptionCard[] | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const segments = useMemo(() => splitScript(script), [script]);
@@ -60,6 +65,7 @@ export default function VideoEditor() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      setProjectId(data.projectId);
       // Poll job status until done/failed.
       pollRef.current = setInterval(async () => {
         const s = await fetch(`/api/render?jobId=${data.jobId}`).then((r) => r.json());
@@ -72,6 +78,11 @@ export default function VideoEditor() {
           // Public render URL (bucket is public; path = user/project/base.mp4).
           const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
           if (base && s.result_path) setVideoUrl(`${base}/storage/v1/object/public/renders/${s.result_path}`);
+          // Load the caption cards the worker saved, then open the caption studio.
+          if (isSupabaseConfigured() && data.projectId) {
+            const { data: cap } = await browserClient().from("captions").select("cards").eq("project_id", data.projectId).maybeSingle();
+            setCaptionCards(((cap?.cards as CaptionCard[]) ?? []));
+          }
         } else if (s.status === "failed") {
           if (pollRef.current) clearInterval(pollRef.current);
           setRendering(false);
@@ -192,18 +203,21 @@ export default function VideoEditor() {
             <p className="dim" style={{ textAlign: "center" }}>
               คลิปยาว ~{fmt(clipLen)} · ใช้ ~{Math.max(1, Math.ceil(clipLen / 60))} นาที · ปิดแท็บได้ งานทำต่อเบื้องหลัง
             </p>
-            {videoUrl && (
-              <div className="card">
-                <h3>✅ เรนเดอร์เสร็จแล้ว</h3>
-                <p className="dim">แก้ซับ + ส่งออก มาใน M6 — ตอนนี้ดูวิดีโอฐาน (ยังไม่ฝังซับ) ได้เลย</p>
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <video src={videoUrl} controls style={{ width: "100%", borderRadius: 12, maxHeight: 480 }} />
-                <a className="btn sm" style={{ marginTop: 8 }} href={videoUrl} download target="_blank" rel="noreferrer">⬇ ดาวน์โหลด</a>
-              </div>
-            )}
+            {videoUrl && !captionCards && <p className="dim">กำลังโหลดซับ…</p>}
             <button className="btn" style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
               onClick={() => setStep(1)}>← กลับไปแก้สคริปต์</button>
           </div>
+        </div>
+      )}
+
+      {/* Step 03 — caption studio (appears once the render is done + cards loaded) */}
+      {videoUrl && captionCards && projectId && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <span className="pill" style={{ borderColor: "var(--accent)" }}>03 แต่งซับ</span>
+            <b>✅ เรนเดอร์เสร็จแล้ว · แก้ซับเห็นผลทันที ไม่ต้องเรนเดอร์ใหม่</b>
+          </div>
+          <CaptionStudio projectId={projectId} videoUrl={videoUrl} initialCards={captionCards} />
         </div>
       )}
     </div>
