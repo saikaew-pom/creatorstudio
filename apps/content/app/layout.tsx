@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getServerSupabase, isSupabaseConfigured } from "../lib/supabase-server";
 import { AccountFooter } from "./account-footer";
+import { HeaderActions } from "./HeaderActions";
 
 export const metadata: Metadata = {
   title: "Creator Studio — Content Engine",
@@ -25,6 +26,7 @@ const NAV = [
     { href: "/collections", t: "โฟลเดอร์", s: "จัดกลุ่มผลงานตามแคมเปญ · ลูกค้า" },
     { href: "/calendar", t: "ปฏิทินคอนเทนต์", s: "วางแผนโพสต์รายเดือน" },
     { href: "/credits", t: "เครดิต", s: "เครดิตคงเหลือ · เติมเครดิต" },
+    { href: "/pricing", t: "แพ็กเกจ", s: "แผน Free · Pro · Business" },
   ]},
 ];
 
@@ -39,6 +41,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="th">
       <body>
+        <HeaderActions />
         <div className="shell">
           <aside className="sidebar">
             <Link href="/dashboard" className="nav-item">

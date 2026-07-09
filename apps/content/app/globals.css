@@ -16,6 +16,19 @@
   --radius-lg: 16px;
 }
 
+/* Light theme — applied when the user toggles data-theme="light" on <html>. */
+:root[data-theme="light"] {
+  --bg: #f7f7fb;
+  --bg-raised: #ffffff;
+  --bg-inset: #f0f0f6;
+  --border: #dcdce6;
+  --text: #1a1a2a;
+  --text-dim: #6a6a80;
+  --accent: #6d45ff;
+  --accent-2: #8b5cf6;
+  --gold: #b8860b;
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
