@@ -8,3 +8,4 @@ dist/
 .turbo/
 *.tsbuildinfo
 *.generated.sql
+# (render scratch lives in os.tmpdir, never in repo)

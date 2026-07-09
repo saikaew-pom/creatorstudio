@@ -1,0 +1,22 @@
+{
+  "name": "@cs/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "worker": "tsx src/index.ts",
+    "render:once": "tsx src/render-once.ts"
+  },
+  "dependencies": {
+    "@cs/ai": "workspace:*",
+    "@cs/db": "workspace:*",
+    "@cs/prompts": "workspace:*",
+    "@supabase/supabase-js": "^2.45.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
