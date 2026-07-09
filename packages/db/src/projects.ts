@@ -83,7 +83,8 @@ export async function finishJob(
   jobId: string,
   resultPath: string
 ): Promise<void> {
-  await db.from("render_jobs").update({ status: "done", progress: 100, step_label: "เสร็จแล้ว", result_path: resultPath, updated_at: new Date().toISOString() }).eq("id", jobId);
+  // Clear any error from a prior failed attempt so a re-run reports cleanly.
+  await db.from("render_jobs").update({ status: "done", progress: 100, step_label: "เสร็จแล้ว", result_path: resultPath, error: null, updated_at: new Date().toISOString() }).eq("id", jobId);
 }
 
 export async function failJob(db: SupabaseClient, jobId: string, error: string): Promise<void> {

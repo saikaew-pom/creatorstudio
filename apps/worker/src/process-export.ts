@@ -9,7 +9,7 @@ import {
   uploadRender, publicRenderUrl, type RenderJobRow, type ProjectRow,
 } from "@cs/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CaptionCard, CaptionStyle } from "@cs/captions";
+import { DEFAULT_STYLE, type CaptionCard, type CaptionStyle } from "@cs/captions";
 import { burnCaptions } from "./render/export";
 
 export async function processExport(
@@ -26,7 +26,10 @@ export async function processExport(
     const { data: cap } = await admin.from("captions").select("cards, style").eq("project_id", project.id).maybeSingle();
     if (!cap) throw new Error("ยังไม่มีซับสำหรับโปรเจกต์นี้");
     const cards = cap.cards as CaptionCard[];
-    const style = cap.style as CaptionStyle;
+    // Merge over DEFAULT_STYLE: the stored style may be partial (e.g. set_caption_style
+    // saves only {theme, pos}) — missing font_size_px etc. would make the burn's
+    // positioning NaN and dump the caption at y=0. Defaults guarantee a complete style.
+    const style: CaptionStyle = { ...DEFAULT_STYLE, ...((cap.style as Partial<CaptionStyle>) ?? {}) };
 
     // Download the base render (stored at user/project/base.mp4, public bucket).
     const basePath = publicRenderUrl(admin, `${project.user_id}/${project.id}/base.mp4`);

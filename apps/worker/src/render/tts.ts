@@ -15,7 +15,7 @@ export interface TtsSegment {
   duration: number; // seconds
 }
 
-async function synthOne(text: string, voice: string, apiKey: string): Promise<Buffer> {
+async function synthOnce(text: string, voice: string, apiKey: string): Promise<Buffer> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${apiKey}`;
   const body = {
     contents: [{ parts: [{ text }] }],
@@ -36,6 +36,22 @@ async function synthOne(text: string, voice: string, apiKey: string): Promise<Bu
   const b64 = json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData?.data;
   if (!b64) throw new Error("TTS returned no audio");
   return Buffer.from(b64, "base64");
+}
+
+async function synthOne(text: string, voice: string, apiKey: string): Promise<Buffer> {
+  // Gemini TTS DETERMINISTICALLY refuses short imperative/instruction-like Thai lines
+  // ("...should only be used for TTS") — e.g. "ลองใช้วันนี้" (an imperative it reads as
+  // a command to itself). Verified live: wrapping the line in quotes makes it clearly
+  // text-to-read and succeeds, with the quotes NOT spoken (duration unchanged). So:
+  // try plain first (common path untouched), and only on that specific refusal retry
+  // with the quoted variant.
+  try {
+    return await synthOnce(text, voice, apiKey);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (!msg.includes("should only be used for TTS")) throw e;
+    return await synthOnce(`"${text.replace(/"/g, "")}"`, voice, apiKey);
+  }
 }
 
 /** Synthesize each segment to a normalized WAV; returns per-segment durations. */

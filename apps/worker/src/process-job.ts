@@ -11,6 +11,7 @@ import {
   uploadRender, addMinutes, type RenderJobRow, type ProjectRow,
 } from "@cs/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { DEFAULT_STYLE } from "@cs/captions";
 import { renderPreview } from "./render/pipeline";
 
 interface RenderPayload {
@@ -46,7 +47,7 @@ export async function processJob(
     const storagePath = await uploadRender(admin, job.user_id, project.id, bytes, "base");
 
     // Persist captions + rendered segments, mark project rendered.
-    await saveCaptions(admin, project.id, result.captions);
+    await saveCaptions(admin, project.id, result.captions, DEFAULT_STYLE);
     await upsertProject(admin, job.user_id, {
       id: project.id,
       segments: result.segments,
