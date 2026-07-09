@@ -210,7 +210,7 @@ export default function VideoEditor() {
             </div>
             <div className="card">
               <h3>เสียงพากย์</h3>
-              <p className="dim">เสียง AI อ่านสคริปต์ของคุณ · Gemini (ค่าเริ่มต้น) หรือ ElevenLabs</p>
+              <p className="dim">เสียง AI อ่านสคริปต์ของคุณ · MiniMax (ค่าเริ่มต้น) — เสียงไทยธรรมชาติ</p>
               <div className="chip-row">
                 {VOICES.map((v) => (
                   <button key={v.id} className={`chip ${voice === v.id ? "on" : ""}`}
@@ -238,7 +238,7 @@ export default function VideoEditor() {
                 <tbody>
                   <tr><td className="dim">สคริปต์</td><td style={{ textAlign: "right" }}>{segments.length} เซ็กเมนต์ · ~{fmt(clipLen)}</td></tr>
                   <tr><td className="dim">บีโรล</td><td style={{ textAlign: "right" }}>{brollTier}</td></tr>
-                  <tr><td className="dim">เสียง</td><td style={{ textAlign: "right" }}>Gemini · {VOICES.find((v) => v.id === voice)?.name}</td></tr>
+                  <tr><td className="dim">เสียง</td><td style={{ textAlign: "right" }}>MiniMax · {VOICES.find((v) => v.id === voice)?.name}</td></tr>
                   <tr><td className="dim">เพลง</td><td style={{ textAlign: "right" }}>{mood.split(" ·")[0]}</td></tr>
                   <tr><td className="dim">อวตาร</td><td style={{ textAlign: "right" }}>Faceless</td></tr>
                 </tbody>
