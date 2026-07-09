@@ -13,8 +13,22 @@ AI-powered creator studio for the Thai market — two apps, one monorepo.
 | `packages/db` — full Postgres schema + RLS + credit/quota/refund RPCs + storage + client layer + auth | ✅ **verified against real Postgres (PGlite) with RLS actually enforced, 30/30** |
 | `apps/content` — Content/Image/Viral Studio + Brand Voice + Style Cloner + auth + /credits + /history + /collections + /calendar | ✅ **M1 + M3 + M4-core live-verified on hosted Supabase** (see below) |
 | `apps/studio` — dashboard + editor (script→segments→elements→**render**) + auth | ✅ **M5 render loop live-verified** (see below) |
-| `apps/worker` — preview-render pipeline + job worker (TTS→B-roll→ffmpeg→mp4) | ✅ **produces real mp4, verified end-to-end** |
-| Caption studio (M6), export, MCP, payments | ⬜ next (payments deferred) |
+| `apps/worker` — preview-render + **export (caption burn)** pipeline + job worker | ✅ **both render + export verified producing real mp4** |
+| `packages/captions` — shared caption styling (11 themes) → CSS (preview) + SVG (burn) | ✅ **one source of truth, preview↔export parity** |
+| MCP server (M7), upload-own-clip, payments | ⬜ next (payments deferred) |
+
+**M6 live-verified (2026-07-09):** ffmpeg here has no libass/drawtext, so captions burn via a
+cleaner route that also guarantees preview↔export parity — each card renders to a transparent
+PNG (via `@resvg/resvg-js` from the shared `cardToSvg`), ffmpeg overlays it timed to the card;
+the browser preview uses `styleToCss` from the *same* `resolveStyle`. Verified by producing and
+inspecting real files: @resvg renders Thai correctly (combining marks), the export burn puts a
+styled Thai caption over the video with the HOOK word in the emphasis color, all 11 themes are
+visually distinct, and the **export worker job** ran end-to-end (base.mp4 → burned final.mp4 in
+storage, project `exported`, notification). Caught + fixed a mid-word Thai wrap bug
+(`Intl.Segmenter` word boundaries). The step-03 caption studio UI (live CSS overlay + theme/
+font/position controls + export) typechecks and builds; its overlay shares the verified style
+functions. Known simplifications: emphasis is per-card (hook/cta), not per-keyword highlight;
+word-level karaoke/animations deferred.
 
 **M5 live-verified (2026-07-09, hosted Supabase):** all tools verified live first (ffmpeg 8.1,
 Gemini TTS for Thai, Gemini images). Ran the real worker against a real queued job:
