@@ -12,10 +12,18 @@ AI-powered creator studio for the Thai market — two apps, one monorepo.
 | `packages/ai` — Gemini router, real `responseSchema`, JSON repair, patch-merge refine | ✅ typechecks, live-verified |
 | `packages/db` — full Postgres schema + RLS + credit/quota/refund RPCs + storage + client layer + auth | ✅ **verified against real Postgres (PGlite) with RLS actually enforced, 30/30** |
 | `apps/content` — Content/Image/Viral Studio + Brand Voice + Style Cloner + auth + /credits + /history + /collections + /calendar | ✅ **M1 + M3 + M4-core live-verified on hosted Supabase** (see below) |
-| `apps/studio` — dashboard + editor (script→segments→elements→**render**) + auth | ✅ **M5 render loop live-verified** (see below) |
-| `apps/worker` — preview-render + **export (caption burn)** pipeline + job worker | ✅ **both render + export verified producing real mp4** |
+| `apps/studio` — editor (script/upload → render → caption studio → export) + settings/MCP + auth | ✅ **M5–M7 render/caption/export/upload live-verified** |
+| `apps/worker` — preview-render + export burn + **upload-clip transcribe** + job worker | ✅ **all three paths verified producing real mp4** |
 | `packages/captions` — shared caption styling (11 themes) → CSS (preview) + SVG (burn) | ✅ **one source of truth, preview↔export parity** |
-| MCP server (M7), upload-own-clip, payments | ⬜ next (payments deferred) |
+| MCP server — agents drive video (`/api/mcp`, 8 tools, bearer auth) | ✅ **full agent loop verified via curl** |
+| Notifications, light theme, pricing, inspiration (M8) | ✅ **bell + theme + pages verified live** |
+| Payments (Stripe/Omise), Lighthouse/GIF capture, analytics, admin tools | ⬜ deferred (payments = sensitive/keys) |
+
+**🎉 M0–M8 all built and verified end-to-end on hosted Supabase.** Both apps compile, build,
+and were driven through the real browser + worker + DB at each milestone. The full journey works:
+signup → brand voice → content kit → image → viral template → video render (script *or* uploaded
+clip) → caption studio (11 themes, live overlay) → export burn → download — plus agents can drive
+the whole video pipeline over MCP.
 
 **M6 live-verified (2026-07-09):** ffmpeg here has no libass/drawtext, so captions burn via a
 cleaner route that also guarantees preview↔export parity — each card renders to a transparent
