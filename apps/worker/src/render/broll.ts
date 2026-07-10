@@ -8,7 +8,7 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { generateImage } from "@cs/ai";
-import { ffmpeg } from "./ffmpeg";
+import { ffmpeg, X264 } from "./ffmpeg";
 
 const W = 1080;
 const H = 1920;
@@ -32,7 +32,7 @@ async function stillToClip(imgPath: string, duration: number, clipPath: string):
     "-loop", "1", "-i", imgPath,
     "-t", duration.toFixed(3),
     "-vf", vf,
-    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", String(FPS),
+    ...X264, "-r", String(FPS),
     clipPath,
   ]);
 }

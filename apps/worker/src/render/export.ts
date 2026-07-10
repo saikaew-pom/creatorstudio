@@ -8,7 +8,7 @@ import path from "node:path";
 import os from "node:os";
 import { Resvg } from "@resvg/resvg-js";
 import { cardToSvg, type CaptionCard, type CaptionStyle } from "@cs/captions";
-import { ffmpeg } from "./ffmpeg";
+import { ffmpeg, X264 } from "./ffmpeg";
 
 const W = 1080;
 const H = 1920;
@@ -57,7 +57,7 @@ export async function burnCaptions(input: ExportInput): Promise<void> {
       ...inputs,
       "-filter_complex", filter,
       "-map", "[vout]", "-map", "0:a?",
-      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "copy",
+      ...X264, "-c:a", "copy",
       input.outFile,
     ]);
     await input.onProgress?.(100, "เสร็จแล้ว");

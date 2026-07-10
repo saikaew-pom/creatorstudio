@@ -4,7 +4,7 @@
 // tracks back-to-back keeps audio and video perfectly aligned with no drift.
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { ffmpeg } from "./ffmpeg";
+import { ffmpeg, X264 } from "./ffmpeg";
 
 /** Concatenate per-segment voice WAVs into one continuous track. */
 export async function concatVoice(wavPaths: string[], outPath: string): Promise<void> {
@@ -20,7 +20,7 @@ export async function concatVideo(clipPaths: string[], workDir: string, outPath:
   writeFileSync(listPath, clipPaths.map((p) => `file '${p}'`).join("\n"));
   await ffmpeg([
     "-f", "concat", "-safe", "0", "-i", listPath,
-    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30", outPath,
+    ...X264, "-r", "30", outPath,
   ]);
 }
 

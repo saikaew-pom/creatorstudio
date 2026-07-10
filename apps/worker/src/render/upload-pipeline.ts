@@ -6,7 +6,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { ffmpeg, ffprobeDuration } from "./ffmpeg";
+import { ffmpeg, ffprobeDuration, X264 } from "./ffmpeg";
 import { transcribeClip } from "./transcribe";
 import type { CaptionCard } from "@cs/captions";
 
@@ -34,7 +34,7 @@ export async function renderUpload(input: UploadRenderInput): Promise<UploadRend
   await ffmpeg([
     "-i", input.sourcePath,
     "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1",
-    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30",
+    ...X264, "-r", "30",
     "-c:a", "aac", "-b:a", "192k",
     input.outFile,
   ]);
