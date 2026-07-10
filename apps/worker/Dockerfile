@@ -1,6 +1,9 @@
 # Build context is the repo root (monorepo — needs packages/* via workspace:*).
 # Railway: builder pinned via ../../railway.json (dockerfilePath), root context stays "/".
-FROM node:20-slim
+# Node 22 (NOT 20): @supabase/supabase-js@2.110+ requires a global WebSocket, which
+# only exists in Node 22+. On Node 20 the RealtimeClient constructor throws
+# "native WebSocket not found" at createClient() time, crash-looping the worker.
+FROM node:22-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
