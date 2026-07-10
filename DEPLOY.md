@@ -43,11 +43,23 @@ is absent), so Vercel's injected env vars are used as-is — no change needed.
 ## 3. The worker — must run somewhere persistent (NOT Vercel)
 `apps/worker` polls `render_jobs` and runs minutes-long ffmpeg renders. Vercel is
 serverless (no long-lived process), so the worker runs on **Railway / Fly / Render / a
-small VM** instead:
-- Start command: `pnpm --filter @cs/worker worker`
-- Env: `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-- Needs **ffmpeg** on the host (the Docker `node:20` image + `apt-get install -y ffmpeg`,
-  or a buildpack that includes it). `@resvg/resvg-js` ships prebuilt binaries.
+small VM** instead. A ready-to-use `apps/worker/Dockerfile` (Node 20 + ffmpeg via apt) is
+already in the repo — build context is the repo root (needed for the `packages/*`
+workspace deps).
+
+**Railway (recommended, ~$5/mo usage-based):**
+1. Railway → New Project → **Deploy from GitHub repo** → this repo.
+2. Settings → Build: set **Dockerfile Path** = `apps/worker/Dockerfile`, root context
+   stays the repo root (default) — do NOT set a Root Directory, since the Dockerfile
+   needs `packages/*` alongside `apps/worker`.
+3. Settings → Environment Variables:
+   - `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+   - `MINIMAX_API_KEY` (TTS — default provider, see [.env.example](.env.example))
+4. No public networking/domain needed — it's a background poller, not a web server.
+5. Deploy. Check logs for the worker's poll loop starting with no errors.
+
+Fly/Render work the same way: point them at `apps/worker/Dockerfile` with the repo root
+as build context, same env vars, no exposed port needed.
 
 **Until the worker is deployed**, the web apps work end-to-end EXCEPT video renders/exports
 will sit in `queued` (nothing processes them). Everything else — content kits, images,
