@@ -3,11 +3,15 @@
 // themes" check. Run: set -a && source ../../.env && set +a && pnpm --filter @cs/worker exec tsx src/export-once.ts
 import path from "node:path";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 import { writeFileSync } from "node:fs";
 import { Resvg } from "@resvg/resvg-js";
 import { cardToSvg, DEFAULT_STYLE, THEMES, type CaptionCard } from "@cs/captions";
 import { renderPreview } from "./render/pipeline";
 import { burnCaptions } from "./render/export";
+
+// Same bundled Thai fonts as render/export.ts (this file lives one level up).
+const FONTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fonts");
 
 const apiKey = process.env.GEMINI_API_KEY!;
 const tmp = os.tmpdir();
@@ -33,7 +37,7 @@ const hook: CaptionCard = { idx: 0, start_ms: 0, end_ms: 3000, text: "ลด 50%
 const keys = Object.keys(THEMES) as (keyof typeof THEMES)[];
 for (const k of keys) {
   const svg = cardToSvg({ ...DEFAULT_STYLE, theme: k, pos_vertical_pct: 50 }, hook, 1080, 400);
-  const png = new Resvg(svg, { background: "rgba(20,20,30,1)", font: { loadSystemFonts: true, defaultFontFamily: "Sarabun" } }).render().asPng();
+  const png = new Resvg(svg, { background: "rgba(20,20,30,1)", font: { fontDirs: [FONTS_DIR], loadSystemFonts: false, defaultFontFamily: "Sarabun" } }).render().asPng();
   writeFileSync(path.join(tmp, `theme-${k}.png`), png);
 }
 console.log("theme PNGs written for:", keys.join(", "));

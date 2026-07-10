@@ -6,12 +6,20 @@
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 import { Resvg } from "@resvg/resvg-js";
 import { cardToSvg, type CaptionCard, type CaptionStyle } from "@cs/captions";
 import { ffmpeg, X264 } from "./ffmpeg";
 
 const W = 1080;
 const H = 1920;
+
+// Bundled Thai fonts (Kanit/Sarabun/Prompt/Mitr, OFL). Loaded explicitly so caption
+// rasterization works in ANY environment — a slim container has no system Thai fonts,
+// which made resvg fall back to a Latin-only face and render Thai as tofu boxes (□□□).
+// Resolve from this module's location (…/src/render/export.ts → …/fonts) so it's
+// independent of the process cwd.
+const FONTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../fonts");
 
 export interface ExportInput {
   basePath: string; // the rendered base.mp4 (no captions)
@@ -32,7 +40,11 @@ export async function burnCaptions(input: ExportInput): Promise<void> {
       const svg = cardToSvg(input.style, card, W, H);
       const png = new Resvg(svg, {
         background: "rgba(0,0,0,0)",
-        font: { loadSystemFonts: true, defaultFontFamily: input.style.font_family || "Sarabun" },
+        font: {
+          fontDirs: [FONTS_DIR],
+          loadSystemFonts: false, // deterministic: only our bundled Thai fonts
+          defaultFontFamily: input.style.font_family || "Sarabun",
+        },
       }).render().asPng();
       const p = path.join(workDir, `cap_${card.idx}.png`);
       writeFileSync(p, png);
