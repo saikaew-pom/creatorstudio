@@ -1,5 +1,5 @@
 # Build context is the repo root (monorepo — needs packages/* via workspace:*).
-# Railway: set this as "Dockerfile Path" = apps/worker/Dockerfile, root context stays "/".
+# Railway: builder pinned via ../../railway.json (dockerfilePath), root context stays "/".
 FROM node:20-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
