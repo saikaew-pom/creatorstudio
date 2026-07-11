@@ -41,8 +41,8 @@ export function NotificationBell() {
       {open && (
         <div style={{
           position: "absolute", right: 0, top: 40, width: 320, zIndex: 50,
-          background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: 12, padding: 10,
-          maxHeight: 380, overflowY: "auto", boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+          background: "var(--bg-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 10,
+          maxHeight: 380, overflowY: "auto", boxShadow: "var(--shadow-popover)",
         }}>
           {items.length === 0 && <p className="dim" style={{ padding: 8 }}>ยังไม่มีการแจ้งเตือน</p>}
           {items.map((n) => (
