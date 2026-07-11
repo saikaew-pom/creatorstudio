@@ -12,6 +12,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@cs/studio", "dev"],
       "port": 3200
+    },
+    {
+      "name": "work",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@cs/work", "dev"],
+      "port": 3300
     }
   ]
 }

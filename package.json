@@ -5,7 +5,8 @@
     "typecheck": "pnpm -r --filter './packages/**' --filter './apps/**' typecheck",
     "build": "pnpm -r --filter './apps/**' build",
     "dev:content": "pnpm --filter @cs/content dev",
-    "dev:studio": "pnpm --filter @cs/studio dev"
+    "dev:studio": "pnpm --filter @cs/studio dev",
+    "dev:work": "pnpm --filter @cs/work dev"
   },
   "packageManager": "pnpm@9.15.9"
 }

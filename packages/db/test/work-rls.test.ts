@@ -70,12 +70,12 @@ async function actAs(uid: string) {
   await db.exec(`set app.uid = '${uid}';`);
 }
 
-// ---- Apply migrations 0001–0006 ----
+// ---- Apply migrations 0001–0006, 0011, 0012 ----
 try {
-  for (const f of ["0001_init.sql", "0002_profile_bootstrap.sql", "0003_refund_rpc.sql", "0004_caption_broll_unique.sql", "0005_workspaces.sql", "0006_work.sql"]) {
+  for (const f of ["0001_init.sql", "0002_profile_bootstrap.sql", "0003_refund_rpc.sql", "0004_caption_broll_unique.sql", "0005_workspaces.sql", "0006_work.sql", "0011_security_hardening.sql", "0012_work_security_hardening.sql"]) {
     await db.exec(mig(f));
   }
-  check("migrations 0001–0006 apply cleanly against real Postgres", true);
+  check("migrations 0001–0006, 0011, 0012 apply cleanly against real Postgres", true);
 } catch (e) {
   check(`migrations apply cleanly — ERROR: ${(e as Error).message}`, false);
   console.log(`\n${pass} passed, ${fail} failed\n`);
@@ -153,6 +153,31 @@ check("the reorder's status change logged a 'status' activity row",
   (await scalar<number>(`select count(*)::int as v from task_activity where kind='status' and task_id='${task3}'`)) === 1);
 const rawActivityInsert = await asAuthUser(USER_A, `insert into task_activity (task_id, workspace_id, kind) values ('${task1}','${wsA}','forged') returning 1 as v`);
 check("clients cannot write task_activity directly (append-only via trigger)", rawActivityInsert.ok === false);
+
+// ---- 0012 GATE: cross-workspace smuggling blocked; ordinary edits still work ----
+console.log("\n== tasks.workspace_id is locked; ordinary task edits still work (0012) ==");
+const ordinaryEdit = await asAuthUser(USER_A, `update tasks set status = 'blocked', title = 'renamed' where id = '${task1}' returning 1 as v`);
+check("ordinary column update (status, title) still succeeds for a member", ordinaryEdit.ok === true);
+await actAs(USER_C);
+await db.exec(`select add_member('${wsC}', '${USER_A}', 'member')`); // A is now ALSO a member of C's workspace
+await actAs(ADMIN);
+await db.exec(`select grant_feature('${wsC}', 'work_crm', null)`); // and it's entitled too
+const smuggle = await asAuthUser(USER_A, `update tasks set workspace_id = '${wsC}' where id = '${task1}' returning 1 as v`);
+check("member of BOTH workspaces cannot move a task's workspace_id (permission denied)", smuggle.ok === false);
+check("task1 is still in wsA", (await scalar<string>(`select workspace_id as v from tasks where id='${task1}'`)) === wsA);
+
+// ---- 0012 GATE: comment delete requires current membership + entitlement ----
+console.log("\n== task_comments delete requires live membership + entitlement (0012) ==");
+const comment = await asAuthUser<string>(USER_B, `insert into task_comments (task_id, workspace_id, body) values ('${task1}','${wsA}','looks good') returning id as v`);
+check("member can insert a comment", comment.ok === true);
+const commentId = comment.ok ? comment.v : "";
+await actAs(USER_A);
+await db.exec(`select remove_member('${wsA}', '${USER_B}')`); // B is removed from the workspace
+const deleteAfterRemoval = await asAuthUser<number>(USER_B, `delete from task_comments where id = '${commentId}' returning 1 as v`);
+// RLS filters DELETE silently (0 rows matched, not an error) — same pattern as
+// campaigns-rls.test.ts's cross-user delete check.
+check("removed member cannot delete their own prior comment", deleteAfterRemoval.ok && deleteAfterRemoval.v === undefined);
+check("the comment row still exists", (await scalar<number>(`select count(*)::int as v from task_comments where id='${commentId}'`)) === 1);
 
 // ---- RLS present ----
 console.log("\n== RLS present on new tables ==");

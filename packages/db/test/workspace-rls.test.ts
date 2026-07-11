@@ -77,12 +77,12 @@ async function actAs(uid: string) {
   await db.exec(`set app.uid = '${uid}';`);
 }
 
-// ---- Apply migrations 0001–0005 ----
+// ---- Apply migrations 0001–0005, 0009, 0010 ----
 try {
-  for (const f of ["0001_init.sql", "0002_profile_bootstrap.sql", "0003_refund_rpc.sql", "0004_caption_broll_unique.sql", "0005_workspaces.sql"]) {
+  for (const f of ["0001_init.sql", "0002_profile_bootstrap.sql", "0003_refund_rpc.sql", "0004_caption_broll_unique.sql", "0005_workspaces.sql", "0009_workspace_profiles_rls.sql", "0010_workspaces_owner_read_fix.sql", "0011_security_hardening.sql"]) {
     await db.exec(mig(f));
   }
-  check("migrations 0001–0005 apply cleanly against real Postgres", true);
+  check("migrations 0001–0005, 0009, 0010, 0011 apply cleanly against real Postgres", true);
 } catch (e) {
   check(`migrations apply cleanly — ERROR: ${(e as Error).message}`, false);
   console.log(`\n${pass} passed, ${fail} failed\n`);
@@ -128,6 +128,11 @@ console.log("\n== workspace_members is write-locked to definer RPCs ==");
 const rawInsert = await asAuthUser(USER_A, `insert into workspace_members (workspace_id, user_id, role) values ('${wsA}','${USER_B}','member') returning 1 as v`);
 check("raw INSERT into workspace_members as authenticated is rejected", rawInsert.ok === false);
 
+// ---- 0009: teammate profile visibility follows membership exactly ----
+console.log("\n== teammate profile reads (0009) — off before membership ==");
+const bReadsAProfileBefore = await asAuthUser<number>(USER_B, `select count(*)::int as v from profiles where id='${USER_A}'`);
+check("B cannot read A's profile before sharing a workspace", bReadsAProfileBefore.ok && bReadsAProfileBefore.v === 0);
+
 // ---- add_member (owner/admin only) shares the workspace ----
 console.log("\n== add_member enforces role + actually grants access ==");
 const addByOutsider = await asAuthUser(USER_B, `select add_member('${wsA}','${ADMIN}','member') as v`);
@@ -138,6 +143,10 @@ await actAs(USER_B);
 check("is_ws_member true for B after add", (await scalar<boolean>(`select is_ws_member('${wsA}') as v`)) === true);
 const bNowSeesA = await asAuthUser<number>(USER_B, `select count(*)::int as v from workspaces where id='${wsA}'`);
 check("B now reads A's workspace (exactly members, no more no less)", bNowSeesA.ok && bNowSeesA.v === 1);
+const bReadsAProfileAfterAdd = await asAuthUser<number>(USER_B, `select count(*)::int as v from profiles where id='${USER_A}'`);
+check("B can read A's profile once they share a workspace", bReadsAProfileAfterAdd.ok && bReadsAProfileAfterAdd.v === 1);
+const adminReadsAProfile = await asAuthUser<number>(ADMIN, `select count(*)::int as v from profiles where id='${USER_A}'`);
+check("ADMIN (not a member of wsA) still cannot read A's profile", adminReadsAProfile.ok && adminReadsAProfile.v === 0);
 
 // ---- remove_member soft-removes and flips access off immediately ----
 console.log("\n== remove_member revokes access; owner is protected ==");
@@ -147,6 +156,8 @@ check("cannot remove the owner (raises)", removeOwner.ok === false);
 await db.exec(`select remove_member('${wsA}', '${USER_B}')`);
 const bAfterRemoval = await asAuthUser<number>(USER_B, `select count(*)::int as v from workspaces where id='${wsA}'`);
 check("removed member reads 0 of A's workspace again", bAfterRemoval.ok && bAfterRemoval.v === 0);
+const bReadsAProfileAfterRemoval = await asAuthUser<number>(USER_B, `select count(*)::int as v from profiles where id='${USER_A}'`);
+check("B loses profile read on A immediately after removal", bReadsAProfileAfterRemoval.ok && bReadsAProfileAfterRemoval.v === 0);
 
 // ---- Entitlement: admin-only grant, and ws_has_feature honors expiry ----
 console.log("\n== work_crm entitlement (admin grants; expiry honored) ==");
@@ -161,6 +172,34 @@ check("expired grant reads as off", (await scalar<boolean>(`select ws_has_featur
 await db.exec(`select revoke_feature('${wsA}', 'work_crm')`);
 check("revoke removes the entitlement row",
   (await scalar<number>(`select count(*)::int as v from workspace_entitlements where workspace_id='${wsA}'`)) === 0);
+
+// ---- 0011 GATE: profiles.role cannot be self-escalated ----
+console.log("\n== profiles.role is locked from client writes (0011) ==");
+const selfEscalate = await asAuthUser(USER_B, `update profiles set role = 'admin' where id = '${USER_B}' returning 1 as v`);
+check("non-admin cannot UPDATE their own profiles.role (permission denied)", selfEscalate.ok === false);
+check("USER_B's role is still 'user' after the attempt", (await scalar<string>(`select role as v from profiles where id='${USER_B}'`)) === "user");
+
+// ---- 0011 GATE: workspace ownership cannot be hijacked via UPDATE ----
+console.log("\n== workspaces.owner_id cannot be reassigned by a workspace admin, not owner (0011) ==");
+await actAs(USER_A);
+await db.exec(`select add_member('${wsA}', '${USER_B}', 'admin')`); // B is a workspace ADMIN of A's ws — not owner
+const hijack = await asAuthUser(USER_B, `update workspaces set owner_id = '${USER_B}' where id = '${wsA}' returning 1 as v`);
+check("workspace admin (not owner) cannot UPDATE owner_id (permission denied)", hijack.ok === false);
+check("wsA owner_id is unchanged", (await scalar<string>(`select owner_id as v from workspaces where id='${wsA}'`)) === USER_A);
+const hijackPlan = await asAuthUser(USER_B, `update workspaces set plan = 'business' where id = '${wsA}' returning 1 as v`);
+check("workspace admin cannot UPDATE plan either (permission denied)", hijackPlan.ok === false);
+
+// ---- 0011 GATE: workspace_invites read is narrowed to owner/admin ----
+console.log("\n== workspace_invites read is owner/admin only (0011) ==");
+await actAs(USER_A);
+await db.exec(`select create_invite('${wsA}', 'someone@x.co', 'member')`);
+const adminReadsInvites = await asAuthUser<number>(USER_B, `select count(*)::int as v from workspace_invites where workspace_id='${wsA}'`);
+check("workspace admin CAN read pending invites", adminReadsInvites.ok && adminReadsInvites.v === 1);
+await db.exec(`select set_member_role('${wsA}', '${USER_B}', 'member')`); // demote B to plain member
+const plainMemberReadsInvites = await asAuthUser<number>(USER_B, `select count(*)::int as v from workspace_invites where workspace_id='${wsA}'`);
+check("plain member CANNOT read pending invites", plainMemberReadsInvites.ok && plainMemberReadsInvites.v === 0);
+await actAs(USER_A); // asAuthUser(USER_B, ...) above leaves app.uid=USER_B; remove_member needs the owner
+await db.exec(`select remove_member('${wsA}', '${USER_B}')`); // clean up — restore pre-0011-test state
 
 // ---- RLS enabled on every new table ----
 console.log("\n== RLS present on new tables ==");

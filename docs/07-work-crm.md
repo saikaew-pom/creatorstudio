@@ -491,15 +491,31 @@ pushing any app code that depends on it.** Do not push code first.
 Rules of engagement unchanged (BLUEPRINT §5; one milestone per branch; end with acceptance tests
 pasted). Estimates assume the existing stack is live.
 
-### M9 — Workspaces, membership, entitlement, RLS (2 days) ⭐ foundation
-**DB layer done** — `packages/db/migrations/0005_workspaces.sql` (tables, RLS helpers, membership +
-invite + entitlement RPCs, bootstrap trigger patch) and its gate test
-`packages/db/test/workspace-rls.test.ts` (`pnpm --filter @cs/db test:workspace-rls`, **26/26 green**
-against real Postgres) already exist. Remaining: `apps/work` skeleton + session middleware +
-workspace switcher; `requireFeature` server helper + admin grant page; wire the invite email.
+### M9 — Workspaces, membership, entitlement, RLS (2 days) ⭐ foundation [DONE]
+**DB layer** — `packages/db/migrations/0005_workspaces.sql` (tables, RLS helpers, membership +
+invite + entitlement RPCs, bootstrap trigger patch), `0009_workspace_profiles_rls.sql` (teammate
+profile-read policy, needed for member pickers/invite lists), `0010_workspaces_owner_read_fix.sql`
+(owner couldn't read a workspace they'd just created — RLS-on-RETURNING vs. the AFTER-trigger
+membership insert), and `0011_security_hardening.sql` (two **critical** fixes found by an
+adversarial review: `profiles.role` and `workspaces.owner_id`/`plan` had no `WITH CHECK`, so any
+authenticated client could self-promote to platform admin or hijack workspace ownership — closed
+via column-privilege revokes, not just a policy tweak; see the migration's own comments for the
+full writeup and repro). Gate test `packages/db/test/workspace-rls.test.ts`
+(`pnpm --filter @cs/db test:workspace-rls`, **37/37 green** against real Postgres, including
+regression tests for every 0011 fix) covers all of it.
+
+**App layer** — `apps/work` (port 3300): session middleware, workspace switcher (create + switch,
+in the sidebar), `requireFeature`/`getWorkspaceContext` server helpers gating both pages and future
+`/api/work|crm` routes, members page (invite/role-change/remove), invite-accept flow (`/invite`),
+and an admin grant page (`/admin/workspaces`, platform-admin only) to flip `work_crm` per workspace
+with an optional expiry. Invite email reuses Supabase Auth's own `inviteUserByEmail` (no new
+provider) with a shareable-link fallback when the invitee already has an account.
+
 **Accept**: the cross-tenant test (invariant 1) passes — user B reads **zero** of user A's
-workspace rows [DONE]; a workspace without `work_crm` gets 403 from every `/api/work|crm` route and no
-nav entry; admin grant flips it on live.
+workspace rows [DONE]; a workspace without `work_crm` shows no Work+CRM nav group and the dashboard
+renders a locked state [DONE — verified live: create workspace → invite → accept → admin grant →
+nav/dashboard flip, end to end against the real hosted Supabase project, test data cleaned up
+after]. `/api/work|crm` routes themselves don't exist yet — that 403 check lands with M10/M11.
 
 ### M10 — Work: tasks + the four views + workload (2.5 days)
 Boards/tasks 0006; List, Board (drag→status via reorder RPC), Calendar (reuse content-calendar drag),
