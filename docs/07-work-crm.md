@@ -477,6 +477,12 @@ pushing any app code that depends on it.** Do not push code first.
    role after `is_ws_member`, never a client cross-tenant read.
 8. **Member removal** cascades membership but must reassign or null their `assignee_id`/`owner_id`
    (the FK `on delete set null` handles the row; a sweep re-surfaces now-unassigned work).
+9. **Never role-check with a bare `not in` inside a `security definer` RPC.** `ws_role()` is `NULL`
+   for a non-member, and `null not in ('owner','admin')` is `NULL`, which `IF` treats as false — so
+   a bare check lets an outsider through a function that bypasses RLS (privilege escalation). Always
+   `coalesce(ws_role(p_ws),'') not in (...)` / `coalesce((select role...),'') <> 'admin'`. This bug
+   shipped in the first draft of `0005` and was caught only by the M9 gate test running **as the
+   `authenticated` role** — running RPCs as the owner would have hidden it.
 
 ---
 
@@ -486,11 +492,14 @@ Rules of engagement unchanged (BLUEPRINT §5; one milestone per branch; end with
 pasted). Estimates assume the existing stack is live.
 
 ### M9 — Workspaces, membership, entitlement, RLS (2 days) ⭐ foundation
-Tables 0005; RLS helpers; personal-workspace bootstrap; invite/accept/remove RPCs; admin
-`grantFeature` + tiny admin page; `apps/work` skeleton + session middleware + workspace switcher.
-**Accept**: the cross-tenant script (invariant 1) passes — user B reads **zero** of user A's
-workspace rows; a workspace without `work_crm` gets 403 from every `/api/work|crm` route and no nav
-entry; admin grant flips it on live.
+**DB layer done** — `packages/db/migrations/0005_workspaces.sql` (tables, RLS helpers, membership +
+invite + entitlement RPCs, bootstrap trigger patch) and its gate test
+`packages/db/test/workspace-rls.test.ts` (`pnpm --filter @cs/db test:workspace-rls`, **26/26 green**
+against real Postgres) already exist. Remaining: `apps/work` skeleton + session middleware +
+workspace switcher; `requireFeature` server helper + admin grant page; wire the invite email.
+**Accept**: the cross-tenant test (invariant 1) passes — user B reads **zero** of user A's
+workspace rows [DONE]; a workspace without `work_crm` gets 403 from every `/api/work|crm` route and no
+nav entry; admin grant flips it on live.
 
 ### M10 — Work: tasks + the four views + workload (2.5 days)
 Boards/tasks 0006; List, Board (drag→status via reorder RPC), Calendar (reuse content-calendar drag),
