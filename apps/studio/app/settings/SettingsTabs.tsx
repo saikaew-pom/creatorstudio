@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { browserClient, isSupabaseConfigured } from "@cs/db";
+import {
+  browserClient, isSupabaseConfigured, getApiKeyStatus, saveApiKey, deleteApiKey,
+  type ApiKeyProvider, type ApiKeyStatus,
+} from "@cs/db";
 
 export interface SettingsInitial {
   email: string | null;
@@ -127,39 +130,86 @@ function ProfileTab({ initial }: { initial: SettingsInitial }) {
 }
 
 // ---------------- API Keys ----------------
+// M17: real backend (Vault-backed, migration 0008_mcp_credits_and_api_keys.sql) — was
+// previously localStorage/device-local. Shared user_api_keys table means a key saved
+// here is also visible/usable from the content app's Settings, and vice versa.
+const PROVIDERS: { key: ApiKeyProvider; label: string }[] = [
+  { key: "pexels", label: "Pexels" },
+  { key: "pixabay", label: "Pixabay" },
+];
+
 function KeysTab() {
-  const [pexels, setPexels] = useState("");
-  const [pixabay, setPixabay] = useState("");
-  const [saved, setSaved] = useState(false);
-  useEffect(() => {
-    setPexels(localStorage.getItem("cs-pexels-key") ?? "");
-    setPixabay(localStorage.getItem("cs-pixabay-key") ?? "");
-  }, []);
-  function save() {
-    localStorage.setItem("cs-pexels-key", pexels);
-    localStorage.setItem("cs-pixabay-key", pixabay);
-    setSaved(true); setTimeout(() => setSaved(false), 2000);
+  const [statusByProvider, setStatusByProvider] = useState<Record<string, ApiKeyStatus>>({});
+  const [inputs, setInputs] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [savedFlash, setSavedFlash] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    if (!isSupabaseConfigured()) { setLoading(false); return; }
+    try {
+      const rows = await getApiKeyStatus(browserClient());
+      setStatusByProvider(Object.fromEntries(rows.map((r) => [r.provider, r])));
+    } catch { /* not signed in, or no keys yet */ }
+    setLoading(false);
   }
+  useEffect(() => { load(); }, []);
+
+  async function save(provider: ApiKeyProvider) {
+    const secret = inputs[provider]?.trim();
+    if (!secret) return;
+    setBusy(provider);
+    try {
+      await saveApiKey(browserClient(), provider, secret);
+      setInputs((p) => ({ ...p, [provider]: "" }));
+      await load();
+      setSavedFlash(provider);
+      setTimeout(() => setSavedFlash(null), 2000);
+    } catch { /* surfaced via status not refreshing */ } finally { setBusy(null); }
+  }
+  async function remove(provider: ApiKeyProvider) {
+    setBusy(provider);
+    try { await deleteApiKey(browserClient(), provider); await load(); } finally { setBusy(null); }
+  }
+
   return (
-    <>
-      <div className="card">
-        <h3>API Keys</h3>
-        <p className="dim" style={{ marginTop: -4 }}>Gemini + MiniMax จัดการให้แล้ว — ใส่ Pexels/Pixabay เองเพื่อใช้ B-roll สต็อกฟรี</p>
-        <div className="prompt-box" style={{ marginTop: 8 }}>
-          ✓ Gemini (รูป + สคริปต์) — จัดการให้แล้ว<br />✓ MiniMax (เสียงไทย) — จัดการให้แล้ว
-        </div>
-        <div className="label">Pexels API Key</div>
-        <input className="input" placeholder="ใส่คีย์ Pexels" value={pexels} onChange={(e) => setPexels(e.target.value)} />
-        <div className="label">Pixabay API Key</div>
-        <input className="input" placeholder="ใส่คีย์ Pixabay" value={pixabay} onChange={(e) => setPixabay(e.target.value)} />
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-          <button className="btn primary" onClick={save}>{saved ? "บันทึกแล้ว ✓" : "บันทึกคีย์"}</button>
-        </div>
-        <p className="dim" style={{ marginTop: 10, fontSize: 12 }}>
-          ⚠ ตอนนี้คีย์เก็บบนเครื่องนี้ (device-local) — การเชื่อมคีย์เข้ากับ worker ฝั่งเซิร์ฟเวอร์อยู่ในแผนถัดไป
-        </p>
+    <div className="card">
+      <h3>API Keys</h3>
+      <p className="dim" style={{ marginTop: -4 }}>Gemini + MiniMax จัดการให้แล้ว — ใส่ Pexels/Pixabay เองเพื่อใช้ B-roll สต็อกฟรี</p>
+      <div className="prompt-box" style={{ marginTop: 8 }}>
+        ✓ Gemini (รูป + สคริปต์) — จัดการให้แล้ว<br />✓ MiniMax (เสียงไทย) — จัดการให้แล้ว
       </div>
-    </>
+
+      {!loading && PROVIDERS.map((p) => {
+        const status = statusByProvider[p.key];
+        return (
+          <div key={p.key} style={{ marginTop: 14 }}>
+            <div className="label">{p.label} API Key</div>
+            {status ? (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
+                <span>
+                  <span className="prompt-box" style={{ padding: "4px 10px", display: "inline-block" }}>•••• {status.last4}</span>{" "}
+                  <span className="pill" style={{ fontSize: 11, marginLeft: 6 }}>{status.status}</span>
+                </span>
+                <button className="btn sm" onClick={() => remove(p.key)} disabled={busy === p.key}>ลบ</button>
+              </div>
+            ) : (
+              <div className="dim" style={{ fontSize: 12, marginBottom: 6 }}>ยังไม่ได้ใส่คีย์</div>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+              <input className="input" type="password" placeholder="ใส่คีย์ใหม่"
+                value={inputs[p.key] ?? ""} onChange={(e) => setInputs((prev) => ({ ...prev, [p.key]: e.target.value }))} />
+              <button className="btn primary" onClick={() => save(p.key)} disabled={busy === p.key || !inputs[p.key]?.trim()}>
+                {savedFlash === p.key ? "บันทึกแล้ว ✓" : "บันทึก"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      <p className="dim" style={{ marginTop: 14, fontSize: 12 }}>
+        🔒 คีย์ถูกเข้ารหัสเก็บฝั่งเซิร์ฟเวอร์ (Supabase Vault) — ไม่แสดงค่าจริงอีกหลังบันทึก เห็นแค่ 4 ตัวท้าย
+      </p>
+    </div>
   );
 }
 

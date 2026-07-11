@@ -21,6 +21,7 @@ const NAV = [
     { href: "/calendar", tKey: "nav.calendar.t" as StringKey, sKey: "nav.calendar.s" as StringKey, icon: "📅" },
     { href: "/credits", tKey: "nav.credits.t" as StringKey, sKey: "nav.credits.s" as StringKey, icon: "🪙" },
     { href: "/pricing", tKey: "nav.pricing.t" as StringKey, sKey: "nav.pricing.s" as StringKey, icon: "💳" },
+    { href: "/settings", tKey: "nav.settings.t" as StringKey, sKey: "nav.settings.s" as StringKey, icon: "⚙️" },
   ]},
 ];
 

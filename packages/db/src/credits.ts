@@ -77,6 +77,22 @@ export async function tryConsumeDailyUse(
   return data as number;
 }
 
+/** Service-role only (migration 0008) — for MCP tool calls, which run on the admin
+ * client with no session, so the auth.uid()-based try_consume_daily_use above can't
+ * resolve the caller. `admin` must be the service-role client. */
+export async function tryConsumeDailyUseForUser(
+  admin: SupabaseClient,
+  userId: string,
+  tool: string,
+  limit: number
+): Promise<number> {
+  const { data, error } = await admin.rpc("try_consume_daily_use_for_user", {
+    p_user_id: userId, p_tool: tool, p_limit: limit,
+  });
+  if (error) throw error;
+  return data as number;
+}
+
 export async function getCreditHistory(
   db: SupabaseClient,
   limit = 50
