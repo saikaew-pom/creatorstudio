@@ -18,59 +18,73 @@ import {
 export const TEMPLATE_CHIPS = {
   portfolio: {
     name_th: "Portfolio งานที่ทำ",
+    name_en: "Portfolio showcase",
     structure: "เล่าเคสงานจริง 1 ชิ้น: โจทย์ → วิธีทำ → ผลลัพธ์ → บทเรียน ปิดด้วยชวนคุยงาน",
   },
   day_in_life: {
     name_th: "Day in the life",
+    name_en: "Day in the life",
     structure: "เล่า 1 วันของเจ้าของ/ทีมแบบ behind-the-scenes มี timestamp เช้า-เย็น จบด้วย insight",
   },
   new_product: {
     name_th: "เปิดตัวสินค้าใหม่",
+    name_en: "New product launch",
     structure: "tease pain → เปิดตัว → 3 จุดเด่น → โปรเปิดตัว → CTA สั่งซื้อ",
   },
   honest_review: {
     name_th: "รีวิวแบบจริงใจ",
+    name_en: "Honest review",
     structure: "รีวิวตรงไปตรงมา มีทั้งข้อดีและข้อจำกัด สร้างความน่าเชื่อถือ จบด้วยเหมาะกับใคร",
   },
   before_after: {
     name_th: "Before-After",
+    name_en: "Before-After",
     structure: "ภาพก่อน/หลังชัดเจน เล่า transformation เป็นขั้น ห้ามเคลมเกินจริง",
   },
   five_tips: {
     name_th: "เคล็ดลับ 5 ข้อ",
+    name_en: "5 quick tips",
     structure: "ลิสต์ 5 ข้อ actionable ข้อละ 1-2 ประโยค ข้อสุดท้ายเก็บทีเด็ด จบชวน save",
   },
   promotion: {
     name_th: "Promotion ลดราคา",
+    name_en: "Promotion / discount",
     structure: "urgency จริง (เวลา/จำนวนจำกัด) → ของ/ราคา → วิธีรับสิทธิ์ 1-2-3 → CTA ด่วน",
   },
   // M15: added so "ขาย/Sell" has a direct sales option (the borrowed 7-chip set had none).
   sales_post: {
     name_th: "โพสต์ขายตรงๆ",
+    name_en: "Direct sales post",
     structure: "hook เจ็บจริง → สินค้าแก้ยังไง (1 ย่อหน้า) → ราคา/โปรชัดเจน → ตอบ objection ที่พบบ่อย 1 ข้อ → CTA สั่งซื้อ + ช่องทางทัก",
   },
   flash_sale: {
     name_th: "Flash Sale ด่วน",
+    name_en: "Flash sale",
     structure: "เปิดด้วยเวลาจำกัด (นับถอยหลัง) → ของมีจำนวนจำกัดเท่าไร → ราคาเดิม/ราคาใหม่ → เงื่อนไขสั้น → CTA ตอนนี้",
   },
   customer_story: {
     name_th: "เรื่องจริงจากลูกค้า",
+    name_en: "Customer story",
     structure: "quote ลูกค้า 1 ประโยคเปิด → ปัญหาก่อนใช้ → จุดเปลี่ยน → ผลลัพธ์วัดได้ → ชวนคนที่เจอปัญหาเดียวกันทัก",
   },
   myth_bust: {
     name_th: "ความเชื่อผิดๆ",
+    name_en: "Myth-busting",
     structure: "ยกความเชื่อผิดที่คนในวงการพูดบ่อย → ทำไมผิด (เหตุผล/ตัวเลข) → ความจริงคืออะไร → สิ่งที่ควรทำแทน",
   },
   how_to: {
     name_th: "สอนทำทีละขั้น",
+    name_en: "Step-by-step how-to",
     structure: "ผลลัพธ์ที่จะได้ (ก่อน) → ของที่ต้องมี → ขั้นตอน 3-5 ขั้นเป็นข้อ → จุดพลาดบ่อย 1 ข้อ → CTA เซฟโพสต์",
   },
   behind_scenes: {
     name_th: "เบื้องหลังงาน",
+    name_en: "Behind the scenes",
     structure: "โชว์ขั้นตอนที่ลูกค้าไม่เคยเห็น → detail ที่ใส่ใจเป็นพิเศษ → ทำไมถึงทำแบบนี้ → เชื่อมกลับคุณภาพงาน",
   },
   q_and_a: {
     name_th: "ตอบคำถามที่ถูกถามบ่อย",
+    name_en: "FAQ answered",
     structure: "คำถามจริงจากลูกค้า 1 ข้อเป็น hook → ตอบตรงๆ ละเอียด → ตัวอย่างประกอบ → ชวนถามต่อในคอมเมนต์",
   },
 } as const;

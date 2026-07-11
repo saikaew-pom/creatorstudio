@@ -1,39 +1,42 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useT } from "./LangProvider";
+import type { StringKey } from "../lib/i18n";
 
 const NAV = [
-  { group: "สร้าง CONTENT", items: [
-    { href: "/viral-studio", t: "Viral Studio", s: "หาเทรนด์มาแรงมาทำคอนเทนต์", icon: "🔥" },
-    { href: "/studio", t: "Content Studio", s: "คิดไอเดีย · hook · สคริปต์ · ภาพ · แฮชแท็ก", icon: "✏️" },
-    { href: "/image-studio", t: "Visual Studio", s: "สร้างภาพแบรนด์ — เทมเพลตพร้อมใช้", icon: "🖼️" },
-    { href: "/inspiration", t: "Inspiration", s: "แรงบันดาลใจจากผลงานจริง · ใช้เลย", icon: "💡" },
+  { groupKey: "nav.group.create" as StringKey, items: [
+    { href: "/viral-studio", tKey: "nav.viral_studio.t" as StringKey, sKey: "nav.viral_studio.s" as StringKey, icon: "🔥" },
+    { href: "/studio", tKey: "nav.content_studio.t" as StringKey, sKey: "nav.content_studio.s" as StringKey, icon: "✏️" },
+    { href: "/image-studio", tKey: "nav.visual_studio.t" as StringKey, sKey: "nav.visual_studio.s" as StringKey, icon: "🖼️" },
+    { href: "/inspiration", tKey: "nav.inspiration.t" as StringKey, sKey: "nav.inspiration.s" as StringKey, icon: "💡" },
   ]},
-  { group: "แบรนด์ของคุณ", items: [
-    { href: "/brands", t: "Brand Voice", s: "ตั้งโทน/สไตล์แบรนด์ของคุณ", icon: "🎙️" },
-    { href: "/styles", t: "Style ของฉัน", s: "Style ที่โคลนไว้ใช้ใน Studio", icon: "🎨" },
+  { groupKey: "nav.group.brand" as StringKey, items: [
+    { href: "/brands", tKey: "nav.brand_voice.t" as StringKey, sKey: "nav.brand_voice.s" as StringKey, icon: "🎙️" },
+    { href: "/styles", tKey: "nav.styles.t" as StringKey, sKey: "nav.styles.s" as StringKey, icon: "🎨" },
   ]},
-  { group: "ของฉัน", items: [
-    { href: "/history", t: "ผลงานของฉัน", s: "ภาพ · เนื้อหา · เทรนด์", icon: "🗂️" },
-    { href: "/collections", t: "โฟลเดอร์", s: "จัดกลุ่มผลงานตามแคมเปญ · ลูกค้า", icon: "📁" },
-    { href: "/calendar", t: "ปฏิทินคอนเทนต์", s: "วางแผนโพสต์รายเดือน", icon: "📅" },
-    { href: "/credits", t: "เครดิต", s: "เครดิตคงเหลือ · เติมเครดิต", icon: "🪙" },
-    { href: "/pricing", t: "แพ็กเกจ", s: "แผน Free · Pro · Business", icon: "💳" },
+  { groupKey: "nav.group.mine" as StringKey, items: [
+    { href: "/history", tKey: "nav.history.t" as StringKey, sKey: "nav.history.s" as StringKey, icon: "🗂️" },
+    { href: "/collections", tKey: "nav.collections.t" as StringKey, sKey: "nav.collections.s" as StringKey, icon: "📁" },
+    { href: "/calendar", tKey: "nav.calendar.t" as StringKey, sKey: "nav.calendar.s" as StringKey, icon: "📅" },
+    { href: "/credits", tKey: "nav.credits.t" as StringKey, sKey: "nav.credits.s" as StringKey, icon: "🪙" },
+    { href: "/pricing", tKey: "nav.pricing.t" as StringKey, sKey: "nav.pricing.s" as StringKey, icon: "💳" },
   ]},
 ];
 
 export function SidebarNav() {
   const path = usePathname();
+  const t = useT();
   return (
     <>
       <Link href="/dashboard" className={`nav-item${path === "/dashboard" ? " active" : ""}`}
         style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
         <span style={{ width: 18, textAlign: "center" }}>▦</span>
-        <span className="t">Dashboard</span>
+        <span className="t">{t("nav.dashboard")}</span>
       </Link>
       {NAV.map((g) => (
-        <div key={g.group}>
-          <div className="group-label">{g.group}</div>
+        <div key={g.groupKey}>
+          <div className="group-label">{t(g.groupKey)}</div>
           {g.items.map((i) => {
             const active = path === i.href || path?.startsWith(i.href + "/");
             return (
@@ -41,8 +44,8 @@ export function SidebarNav() {
                 style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
                 <span style={{ width: 18, textAlign: "center", flexShrink: 0, marginTop: 1 }}>{i.icon}</span>
                 <span style={{ display: "flex", flexDirection: "column" }}>
-                  <span className="t">{i.t}</span>
-                  <span className="s">{i.s}</span>
+                  <span className="t">{t(i.tKey)}</span>
+                  <span className="s">{t(i.sKey)}</span>
                 </span>
               </Link>
             );

@@ -4,10 +4,13 @@
 // Content Studio flow via ?topic=&template= (already read by StudioInner on mount).
 import { useState } from "react";
 import { TEMPLATE_CHIPS, type DayPlan } from "@cs/prompts";
+import { useT, useLang } from "../LangProvider";
 
 const GOAL_ICON = ["🎬", "📚", "📚", "🤝", "🤝", "💬", "🔥"]; // day 1..7 visual rhythm
 
 export function CampaignPanel({ topic, niche }: { topic: string; niche: string }) {
+  const t = useT();
+  const { lang } = useLang();
   const [days, setDays] = useState<DayPlan[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,27 +39,27 @@ export function CampaignPanel({ topic, niche }: { topic: string; niche: string }
   return (
     <div className="card" style={{ borderColor: "var(--gold)" }}>
       <div className="section-head">
-        <h3>🗓️ แคมเปญ 7 วัน <span className="pill" style={{ fontSize: 11, color: "var(--gold)", borderColor: "var(--gold)" }}>ใหม่</span></h3>
+        <h3>{t("campaign.title")} <span className="pill" style={{ fontSize: 11, color: "var(--gold)", borderColor: "var(--gold)" }}>{t("campaign.badge_new")}</span></h3>
       </div>
       <p className="dim" style={{ marginTop: -4 }}>
-        แทนที่จะสร้างทีละโพสต์ — ให้ AI วางแผนคอนเทนต์ 7 วันรวดที่มีสตอรี่อาร์คต่อเนื่อง (รับรู้ → ให้ความรู้ → เชื่อใจ → ปิดการขาย) จากหัวข้อเดียวกันด้านบน
+        {t("campaign.desc")}
       </p>
       {!days && (
         <button className="btn primary" disabled={!topic.trim() || loading} onClick={generateCampaign}>
-          {loading ? <><span className="spin" /> กำลังวางแผนแคมเปญ 7 วัน…</> : "🗓️ สร้างแคมเปญ 7 วัน (5 เครดิต)"}
+          {loading ? <><span className="spin" /> {t("campaign.generating")}</> : t("campaign.generate_btn")}
         </button>
       )}
       {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
 
       {days && (
         <>
-          {creditsSpent ? <p className="dim" style={{ fontSize: 12 }}>ใช้ไป {creditsSpent} เครดิต</p> : null}
+          {creditsSpent ? <p className="dim" style={{ fontSize: 12 }}>{t("campaign.credits_spent")} {creditsSpent} {t("campaign.credits_unit")}</p> : null}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 8 }}>
             {days.map((d) => (
               <div key={d.day} className="card" style={{ margin: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <b>Day {d.day} {GOAL_ICON[d.day - 1] ?? ""}</b>
-                  <span className="pill" style={{ fontSize: 11 }}>{TEMPLATE_CHIPS[d.template]?.name_th ?? d.template}</span>
+                  <span className="pill" style={{ fontSize: 11 }}>{(lang === "th" ? TEMPLATE_CHIPS[d.template]?.name_th : TEMPLATE_CHIPS[d.template]?.name_en) ?? d.template}</span>
                 </div>
                 <p className="dim" style={{ fontSize: 12, margin: "6px 0" }}>{d.goal_th}</p>
                 <div className="caption-box" style={{ fontSize: 13 }}>{d.hook}</div>
@@ -69,12 +72,12 @@ export function CampaignPanel({ topic, niche }: { topic: string; niche: string }
                   href={`/studio?topic=${encodeURIComponent(d.topic_line)}&template=${d.template}`}
                   className="btn sm" style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
                 >
-                  สร้างโพสต์เต็ม →
+                  {t("campaign.full_post")}
                 </a>
               </div>
             ))}
           </div>
-          <button className="btn sm" style={{ marginTop: 10 }} onClick={() => setDays(null)}>← สร้างแคมเปญใหม่</button>
+          <button className="btn sm" style={{ marginTop: 10 }} onClick={() => setDays(null)}>{t("campaign.new")}</button>
         </>
       )}
     </div>

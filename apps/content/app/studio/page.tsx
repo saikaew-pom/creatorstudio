@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { browserClient, isSupabaseConfigured, type BrandRow, type StyleRow } from "@cs/db";
 import { RECIPE_GROUPS, TEMPLATE_CHIPS, type ContentKit, type Platform, type TemplateChip } from "@cs/prompts";
 import { CampaignPanel } from "./CampaignPanel";
+import { useT, useLang } from "../LangProvider";
 
 // Per-chip icon (presentation only — TEMPLATE_CHIPS/RECIPE_GROUPS in @cs/prompts stay
 // the source of truth for names/structure/grouping; M15 "Content Recipes" redesign).
@@ -13,20 +14,25 @@ const CHIP_ICONS: Record<TemplateChip, string> = {
   sales_post: "🛍️", flash_sale: "⚡", customer_story: "💬",
   myth_bust: "❌", how_to: "🧭", behind_scenes: "🎬", q_and_a: "❓",
 };
-const NICHES = ["ทั่วไป","ขายของออนไลน์","ร้านอาหาร","อสังหาริมทรัพย์","การเงิน-ลงทุน","สุขภาพ-ความงาม","การศึกษา-คอร์ส","ฟรีแลนซ์-บริการ","เกษตร-OTOP","ช่าง-รับเหมา","ท่องเที่ยว-โรงแรม","Personal Brand"];
-const PLATFORMS: { key: Platform; label: string }[] = [
-  { key: "facebook", label: "Facebook" },
-  { key: "instagram", label: "Instagram" },
-  { key: "tiktok", label: "TikTok" },
-  { key: "youtube", label: "YouTube" },
-  { key: "tts", label: "TTS (เสียง)" },
+const NICHES = [
+  { th: "ทั่วไป", en: "General" }, { th: "ขายของออนไลน์", en: "Online store" }, { th: "ร้านอาหาร", en: "Restaurant" },
+  { th: "อสังหาริมทรัพย์", en: "Real estate" }, { th: "การเงิน-ลงทุน", en: "Finance/Investing" }, { th: "สุขภาพ-ความงาม", en: "Health/Beauty" },
+  { th: "การศึกษา-คอร์ส", en: "Education/Courses" }, { th: "ฟรีแลนซ์-บริการ", en: "Freelance/Services" }, { th: "เกษตร-OTOP", en: "Agriculture/OTOP" },
+  { th: "ช่าง-รับเหมา", en: "Contractor/Trades" }, { th: "ท่องเที่ยว-โรงแรม", en: "Travel/Hotel" }, { th: "Personal Brand", en: "Personal Brand" },
 ];
-const HOOK_TYPES: { key: string; label: string }[] = [
-  { key: "auto", label: "✨ อัตโนมัติ" },
-  { key: "question", label: "❓ คำถาม" },
-  { key: "fomo", label: "🔥 FOMO" },
-  { key: "story", label: "📖 เรื่องเล่า" },
-  { key: "stat", label: "📊 สถิติ-ตัวเลข" },
+const PLATFORMS: { key: Platform; th: string; en: string }[] = [
+  { key: "facebook", th: "Facebook", en: "Facebook" },
+  { key: "instagram", th: "Instagram", en: "Instagram" },
+  { key: "tiktok", th: "TikTok", en: "TikTok" },
+  { key: "youtube", th: "YouTube", en: "YouTube" },
+  { key: "tts", th: "TTS (เสียง)", en: "TTS (audio)" },
+];
+const HOOK_TYPES: { key: string; th: string; en: string }[] = [
+  { key: "auto", th: "✨ อัตโนมัติ", en: "✨ Auto" },
+  { key: "question", th: "❓ คำถาม", en: "❓ Question" },
+  { key: "fomo", th: "🔥 FOMO", en: "🔥 FOMO" },
+  { key: "story", th: "📖 เรื่องเล่า", en: "📖 Story" },
+  { key: "stat", th: "📊 สถิติ-ตัวเลข", en: "📊 Stat/Number" },
 ];
 
 function copy(text: string) {
@@ -35,6 +41,8 @@ function copy(text: string) {
 
 function StudioInner() {
   const params = useSearchParams();
+  const t = useT();
+  const { lang } = useLang();
   const [topic, setTopic] = useState(params.get("topic") ?? "");
   const [niche, setNiche] = useState("");
   // Deep-link from Campaign Mode's week grid ("สร้างโพสต์เต็ม →") pre-selects the
@@ -73,7 +81,7 @@ function StudioInner() {
   }, []);
 
   async function generate() {
-    setLoading("กำลังสร้างชุดคอนเทนต์… (hook · สคริปต์ · visual · แฮชแท็ก)");
+    setLoading(t("studio.generating"));
     setError(null);
     try {
       const res = await fetch("/api/generate", {
@@ -96,7 +104,7 @@ function StudioInner() {
   async function refineAll(section?: "hook" | "script" | "visual" | "hashtags", instruction?: string) {
     const inst = instruction ?? refineText;
     if (!kit || !inst.trim()) return;
-    setLoading(section ? `กำลังปรับส่วน ${section}…` : "กำลังปรับทั้งชุด…");
+    setLoading(section ? `${t("studio.refining_section")} ${section}…` : t("studio.refining_all"));
     setError(null);
     try {
       const res = await fetch("/api/refine", {
@@ -116,7 +124,7 @@ function StudioInner() {
   }
 
   function sectionRefine(section: "hook" | "script" | "visual" | "hashtags") {
-    const inst = window.prompt("จะให้ปรับยังไงดี? เช่น 'สั้นลง', 'เป็นกันเองขึ้น'");
+    const inst = window.prompt(t("studio.refine_prompt_ask"));
     if (inst) void refineAll(section, inst);
   }
 
@@ -156,38 +164,38 @@ function StudioInner() {
 
   return (
     <div>
-      <h1>Content Studio</h1>
+      <h1>{t("studio.title")}</h1>
       <div className="card">
-        <div className="label">หัวข้อ / ไอเดียที่อยากเล่า</div>
+        <div className="label">{t("studio.topic_label")}</div>
         <textarea
           className="input" rows={2}
-          placeholder='เช่น "AI ช่วย SME ไทยลดต้นทุน 70%" หรือ "5 เคล็ดลับโพสต์ FB ที่ไม่มีคน scroll ผ่าน"'
+          placeholder={t("studio.topic_placeholder")}
           value={topic} onChange={(e) => setTopic(e.target.value)}
         />
-        <div className="label">เลือกสูตรคอนเทนต์ตามเป้าหมาย <span className="dim">Pick a recipe by goal (ไม่บังคับ)</span></div>
+        <div className="label">{t("studio.recipes_label")}</div>
         {RECIPE_GROUPS.map((g) => (
           <div key={g.group_th} style={{ marginBottom: 4 }}>
-            <div className="dim" style={{ fontSize: 12, margin: "6px 0 4px" }}>{g.icon} {g.group_th} · {g.group_en}</div>
+            <div className="dim" style={{ fontSize: 12, margin: "6px 0 4px" }}>{g.icon} {lang === "th" ? g.group_th : g.group_en}</div>
             <div className="chip-row" style={{ marginTop: 0 }}>
               {g.chips.map((key) => (
                 <button key={key} className={`chip ${template === key ? "on" : ""}`}
                   onClick={() => setTemplate(template === key ? undefined : key)}>
-                  {CHIP_ICONS[key]} {TEMPLATE_CHIPS[key].name_th}
+                  {CHIP_ICONS[key]} {lang === "th" ? TEMPLATE_CHIPS[key].name_th : TEMPLATE_CHIPS[key].name_en}
                 </button>
               ))}
             </div>
           </div>
         ))}
-        <div className="label">ประเภทธุรกิจ / Niche <span className="dim">(ไม่บังคับ)</span></div>
-        <input className="input" placeholder="ระบุประเภทธุรกิจของคุณ เช่น เกษตร, ที่ปรึกษา, Personal Brand"
+        <div className="label">{t("studio.niche_label")} <span className="dim">{t("studio.niche_optional")}</span></div>
+        <input className="input" placeholder={t("studio.niche_placeholder")}
           value={niche} onChange={(e) => setNiche(e.target.value)} />
         <div className="chip-row">
           {NICHES.map((n) => (
-            <button key={n} className={`chip ${niche === n ? "on" : ""}`}
-              onClick={() => setNiche(niche === n ? "" : n)}>{n}</button>
+            <button key={n.th} className={`chip ${niche === n.th ? "on" : ""}`}
+              onClick={() => setNiche(niche === n.th ? "" : n.th)}>{lang === "th" ? n.th : n.en}</button>
           ))}
         </div>
-        <div className="label">แพลตฟอร์มที่จะใช้</div>
+        <div className="label">{t("studio.platforms_label")}</div>
         <div className="chip-row">
           {PLATFORMS.map((p) => (
             <button key={p.key} className={`chip ${platforms.includes(p.key) ? "on" : ""}`}
@@ -198,23 +206,23 @@ function StudioInner() {
                     : [...prev, p.key]
                 )
               }>
-              {platforms.includes(p.key) ? "✓ " : ""}{p.label}
+              {platforms.includes(p.key) ? "✓ " : ""}{lang === "th" ? p.th : p.en}
             </button>
           ))}
         </div>
         {(brands.length > 0 || stylesList.length > 0) && (
           <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
             <div style={{ flex: 1 }}>
-              <div className="label">🎨 Brand Voice</div>
+              <div className="label">{t("studio.brand_voice_label")}</div>
               <select className="input" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-                <option value="">ไม่ใช้ Brand Voice</option>
+                <option value="">{t("studio.brand_voice_none")}</option>
                 {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </div>
             <div style={{ flex: 1 }}>
-              <div className="label">✍️ Style</div>
+              <div className="label">{t("studio.style_label")}</div>
               <select className="input" value={styleId} onChange={(e) => setStyleId(e.target.value)}>
-                <option value="">ไม่ใช้ Style</option>
+                <option value="">{t("studio.style_none")}</option>
                 {stylesList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
@@ -223,10 +231,10 @@ function StudioInner() {
         <div style={{ marginTop: 16 }}>
           <button className="btn primary" style={{ width: "100%", justifyContent: "center" }}
             disabled={!topic.trim() || !platforms.length || !!loading} onClick={generate}>
-            {loading ? <><span className="spin" /> {loading}</> : "🚀 เริ่มสร้าง Content"}
+            {loading ? <><span className="spin" /> {loading}</> : t("studio.generate_btn")}
           </button>
         </div>
-        {error && <p style={{ color: "var(--danger)" }}>{error} · เครดิตไม่ถูกหัก ลองใหม่ได้เลย</p>}
+        {error && <p style={{ color: "var(--danger)" }}>{error} · {t("studio.credit_note")}</p>}
       </div>
 
       <CampaignPanel topic={topic} niche={niche} />
@@ -236,21 +244,21 @@ function StudioInner() {
           {/* Hook */}
           <div className="card">
             <div className="section-head">
-              <h3>🎣 Hook</h3>
+              <h3>{t("studio.section.hook")}</h3>
               <div className="section-actions">
-                <button className="btn sm" onClick={() => activeHook && copy(activeHook.text)}>คัดลอก</button>
-                <button className="btn sm" onClick={() => sectionRefine("hook")}>✏️ ปรับ</button>
+                <button className="btn sm" onClick={() => activeHook && copy(activeHook.text)}>{t("studio.copy")}</button>
+                <button className="btn sm" onClick={() => sectionRefine("hook")}>{t("studio.refine")}</button>
               </div>
             </div>
             <div className="chip-row">
               {HOOK_TYPES.map((h) => (
                 <button key={h.key} className={`chip ${activeHookType === h.key ? "on" : ""}`}
-                  onClick={() => setActiveHookType(h.key)}>{h.label}</button>
+                  onClick={() => setActiveHookType(h.key)}>{lang === "th" ? h.th : h.en}</button>
               ))}
             </div>
             <div className="caption-box">{activeHook?.text}</div>
             <button className="btn sm" style={{ marginTop: 8 }} onClick={() => setShowAllHooks(!showAllHooks)}>
-              {showAllHooks ? "▼" : "▶"} ดูตัวเลือกอื่น ({kit.hooks.length - 1})
+              {showAllHooks ? "▼" : "▶"} {t("studio.see_other_hooks")} ({kit.hooks.length - 1})
             </button>
             {showAllHooks && kit.hooks.filter((h) => h !== activeHook).map((h, i) => (
               <div key={i} className="caption-box" style={{ marginTop: 8, cursor: "pointer" }}
@@ -263,10 +271,10 @@ function StudioInner() {
           {/* Script */}
           <div className="card">
             <div className="section-head">
-              <h3>📝 Script</h3>
+              <h3>{t("studio.section.script")}</h3>
               <div className="section-actions">
-                <button className="btn sm" onClick={() => copy(kit.scripts[scriptTab]?.caption ?? "")}>คัดลอก caption</button>
-                <button className="btn sm" onClick={() => sectionRefine("script")}>✏️ ปรับ</button>
+                <button className="btn sm" onClick={() => copy(kit.scripts[scriptTab]?.caption ?? "")}>{t("studio.copy_caption")}</button>
+                <button className="btn sm" onClick={() => sectionRefine("script")}>{t("studio.refine")}</button>
               </div>
             </div>
             <div className="tabs">
@@ -275,7 +283,7 @@ function StudioInner() {
                   onClick={() => setScriptTab(i)}>{s.platform}</button>
               ))}
             </div>
-            <div className="dim" style={{ marginBottom: 6 }}>CAPTION พร้อมโพสต์</div>
+            <div className="dim" style={{ marginBottom: 6 }}>{t("studio.caption_ready")}</div>
             <div className="caption-box">{kit.scripts[scriptTab]?.caption}</div>
             {kit.scripts[scriptTab]?.notes && (
               <p className="dim">💡 {kit.scripts[scriptTab]?.notes}</p>
@@ -285,30 +293,30 @@ function StudioInner() {
           {/* Visual Prompts */}
           <div className="card">
             <div className="section-head">
-              <h3>🎨 Visual Prompts</h3>
+              <h3>{t("studio.section.visual")}</h3>
               <div className="section-actions">
-                <button className="btn sm" onClick={() => sectionRefine("visual")}>✏️ ปรับ</button>
+                <button className="btn sm" onClick={() => sectionRefine("visual")}>{t("studio.refine")}</button>
               </div>
             </div>
             <div className="tabs">
-              <button className={`tab ${visualTab === "cover" ? "on" : ""}`} onClick={() => setVisualTab("cover")}>Cover</button>
-              <button className={`tab ${visualTab === "ill" ? "on" : ""}`} onClick={() => setVisualTab("ill")}>ภาพประกอบ ({kit.visual.illustrations.length})</button>
-              <button className={`tab ${visualTab === "video" ? "on" : ""}`} onClick={() => setVisualTab("video")}>Video (prompt) ({kit.visual.video_prompts.length})</button>
+              <button className={`tab ${visualTab === "cover" ? "on" : ""}`} onClick={() => setVisualTab("cover")}>{t("studio.tab_cover")}</button>
+              <button className={`tab ${visualTab === "ill" ? "on" : ""}`} onClick={() => setVisualTab("ill")}>{t("studio.tab_illustrations")} ({kit.visual.illustrations.length})</button>
+              <button className={`tab ${visualTab === "video" ? "on" : ""}`} onClick={() => setVisualTab("video")}>{t("studio.tab_video")} ({kit.visual.video_prompts.length})</button>
             </div>
             {visualTab === "cover" && (
               <div>
                 <p><span className="pill">{kit.visual.cover.base_aspect} → {kit.visual.cover.crop_hint}</span> <b>{kit.visual.cover.label}</b></p>
                 <div className="prompt-box">{kit.visual.cover.prompt_en}</div>
-                <button className="btn sm" style={{ marginTop: 8 }} onClick={() => copy(kit.visual.cover.prompt_en)}>คัดลอก Prompt</button>
+                <button className="btn sm" style={{ marginTop: 8 }} onClick={() => copy(kit.visual.cover.prompt_en)}>{t("studio.copy_prompt")}</button>
 
                 <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, cursor: "pointer" }}>
                   <input type="checkbox" checked={coverThaiText} onChange={(e) => setCoverThaiText(e.target.checked)} />
-                  <span className="dim">ใส่ข้อความไทยในรูปด้วย (Pro · 5 เครดิต) · ไม่ติ๊ก = เจนรูปอย่างเดียว (Standard · 1 เครดิต)</span>
+                  <span className="dim">{t("studio.thai_text_toggle")}</span>
                 </label>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
-                  <span className="pill">ใช้ {coverThaiText ? 5 : 1} เครดิต</span>
+                  <span className="pill">{t("studio.use_credits")} {coverThaiText ? 5 : 1} {t("campaign.credits_unit")}</span>
                   <button className="btn primary" disabled={coverLoading} onClick={generateCover}>
-                    {coverLoading ? <><span className="spin" /> กำลังสร้างรูป…</> : coverImage ? "🔄 เจนใหม่" : "✨ สร้างรูปนี้"}
+                    {coverLoading ? <><span className="spin" /> {t("studio.generating_image")}</> : coverImage ? t("studio.regenerate") : t("studio.generate_this")}
                   </button>
                 </div>
                 {coverError && <p style={{ color: "var(--danger)" }}>{coverError}</p>}
@@ -316,16 +324,16 @@ function StudioInner() {
                   <div style={{ marginTop: 12 }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={coverImage.url} alt={kit.visual.cover.label} style={{ maxWidth: "100%", borderRadius: 12, display: "block" }} />
-                    <a className="btn sm" style={{ marginTop: 8 }} href={coverImage.url} download target="_blank" rel="noreferrer">⬇ ดาวน์โหลด</a>
+                    <a className="btn sm" style={{ marginTop: 8 }} href={coverImage.url} download target="_blank" rel="noreferrer">{t("studio.download")}</a>
                   </div>
                 )}
               </div>
             )}
             {visualTab === "ill" && kit.visual.illustrations.map((ill, i) => (
               <div key={i} style={{ marginBottom: 12 }}>
-                <p className="dim">ประกอบประเด็น: {ill.matches_point}</p>
+                <p className="dim">{t("studio.matches_point")} {ill.matches_point}</p>
                 <div className="prompt-box">{ill.prompt_en}</div>
-                <button className="btn sm" style={{ marginTop: 6 }} onClick={() => copy(ill.prompt_en)}>คัดลอก</button>
+                <button className="btn sm" style={{ marginTop: 6 }} onClick={() => copy(ill.prompt_en)}>{t("studio.copy")}</button>
               </div>
             ))}
             {visualTab === "video" && kit.visual.video_prompts.map((v) => (
@@ -339,17 +347,17 @@ function StudioInner() {
           {/* Hashtags */}
           <div className="card">
             <div className="section-head">
-              <h3># Hashtags</h3>
+              <h3>{t("studio.section.hashtags")}</h3>
               <div className="section-actions">
-                <button className="btn sm" onClick={() => copy(kit.hashtags.map((h) => h.tags.join(" ")).join("\n"))}>คัดลอกทั้งหมด</button>
-                <button className="btn sm" onClick={() => sectionRefine("hashtags")}>✏️ ปรับ</button>
+                <button className="btn sm" onClick={() => copy(kit.hashtags.map((h) => h.tags.join(" ")).join("\n"))}>{t("studio.copy_all")}</button>
+                <button className="btn sm" onClick={() => sectionRefine("hashtags")}>{t("studio.refine")}</button>
               </div>
             </div>
             {kit.hashtags.map((h) => (
               <div key={h.platform}>
                 <span className="dim">{h.platform}: </span>
                 <div className="chip-row">
-                  {h.tags.map((t) => <span key={t} className="chip">{t}</span>)}
+                  {h.tags.map((tag) => <span key={tag} className="chip">{tag}</span>)}
                 </div>
               </div>
             ))}
@@ -358,25 +366,25 @@ function StudioInner() {
           {/* Status + refine-all */}
           <div className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <b>พร้อมใช้งาน 4/4 ส่วน</b>
+              <b>{t("studio.ready")}</b>
               <div className="dim">Hook · Script · Visual · Hashtags</div>
             </div>
             <button className="btn primary" onClick={() =>
               copy([activeHook?.text, ...kit.scripts.map((s) => `--- ${s.platform} ---\n${s.caption}`),
                 kit.hashtags.map((h) => h.tags.join(" ")).join("\n")].join("\n\n"))
-            }>📋 คัดลอกทั้งหมด</button>
+            }>{t("studio.copy_everything")}</button>
           </div>
 
           <div className="card">
-            <h3>🎨 ปรับทั้งหมดในครั้งเดียว</h3>
-            <p className="dim">พิมพ์รวมๆ เพื่อปรับทุก section — หรือระบุเจาะจงก็ได้ เช่น &quot;ปรับ caption Facebook ให้สั้นลง&quot;, &quot;ปรับ hashtag&quot;</p>
+            <h3>{t("studio.refine_all_title")}</h3>
+            <p className="dim">{t("studio.refine_all_desc")}</p>
             <textarea className="input" rows={2}
               placeholder="เช่น 'ทำให้กระชับขึ้นทุกอัน' หรือเจาะจง 'ปรับ caption Facebook ให้สั้นลง'"
               value={refineText} onChange={(e) => setRefineText(e.target.value)} />
             <div style={{ textAlign: "right", marginTop: 10 }}>
               <button className="btn primary" disabled={!refineText.trim() || !!loading}
                 onClick={() => refineAll()}>
-                {loading ? <><span className="spin" /> {loading}</> : "🚀 ปรับทั้งหมด"}
+                {loading ? <><span className="spin" /> {loading}</> : t("studio.refine_all_btn")}
               </button>
             </div>
           </div>

@@ -2,27 +2,29 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useT } from "../LangProvider";
 
 export default function Dashboard() {
   const [topic, setTopic] = useState("");
   const router = useRouter();
+  const t = useT();
   return (
     <div>
       <div className="topbar">
-        <span className="pill">✏️ ไม่ตั้งแบรนด์</span>
-        <span className="pill">✨ Gemini 2.5 Flash · ฟรี</span>
-        <span className="pill">🔥 สตรีคเริ่มวันนี้</span>
+        <span className="pill">{t("dashboard.pill_no_brand")}</span>
+        <span className="pill">{t("dashboard.pill_model")}</span>
+        <span className="pill">{t("dashboard.pill_streak")}</span>
       </div>
-      <h1 style={{ marginBottom: 4 }}>สวัสดี 👋</h1>
-      <p className="dim">พร้อมสร้าง content วันนี้แล้วหรือยัง?</p>
+      <h1 style={{ marginBottom: 4 }}>{t("dashboard.greeting")} 👋</h1>
+      <p className="dim">{t("dashboard.subtitle")}</p>
 
       <div className="card">
-        <h3>🚀 เริ่มสร้าง Content</h3>
-        <p className="dim" style={{ marginTop: 0 }}>พิมพ์หัวข้อหรือสินค้า แล้วให้ AI สร้างให้ครบ</p>
+        <h3>{t("dashboard.start_title")}</h3>
+        <p className="dim" style={{ marginTop: 0 }}>{t("dashboard.start_desc")}</p>
         <div style={{ display: "flex", gap: 10 }}>
           <input
             className="input"
-            placeholder='เช่น "ครีมกันแดดสำหรับผิวมัน" หรือ "ร้านกาแฟเปิดใหม่"'
+            placeholder={t("dashboard.placeholder")}
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             onKeyDown={(e) => {
@@ -35,31 +37,31 @@ export default function Dashboard() {
             disabled={!topic.trim()}
             onClick={() => router.push(`/studio?topic=${encodeURIComponent(topic)}`)}
           >
-            {topic.trim() ? "สร้างเลย 🚀" : "พิมพ์หัวข้อก่อน ✏️"}
+            {topic.trim() ? t("dashboard.cta_ready") : t("dashboard.cta_empty")}
           </button>
         </div>
         <div className="chip-row" style={{ marginTop: 12 }}>
-          <span className="dim">หรือ:</span>
-          <Link href="/viral-studio" className="chip">🔥 เทรนด์ไวรัล</Link>
-          <Link href="/studio" className="chip">💡 หาไอเดียก่อน</Link>
-          <Link href="/brands" className="chip">✨ ตั้ง Brand</Link>
+          <span className="dim">{t("dashboard.or")}</span>
+          <Link href="/viral-studio" className="chip">{t("dashboard.trend")}</Link>
+          <Link href="/studio" className="chip">{t("dashboard.find_idea")}</Link>
+          <Link href="/brands" className="chip">{t("dashboard.set_brand")}</Link>
         </div>
       </div>
 
       <div className="grid2">
         <div className="card">
-          <h3>เริ่มต้นใช้งาน</h3>
+          <h3>{t("dashboard.getting_started")}</h3>
           <div className="dim">
-            <div>◻ สร้างคอนเทนต์แรก</div>
-            <div>◻ ให้ AI ช่วยคิดไอเดีย</div>
-            <div>◻ ลอง Viral Studio</div>
-            <div>◻ ตั้ง Brand Voice</div>
+            <div>◻ {t("dashboard.step1")}</div>
+            <div>◻ {t("dashboard.step2")}</div>
+            <div>◻ {t("dashboard.step3")}</div>
+            <div>◻ {t("dashboard.step4")}</div>
           </div>
         </div>
         <div className="card">
-          <h3>ล็อกเสียงแบรนด์ให้คอนเทนต์นิ่งขึ้น</h3>
-          <p className="dim">เหมาะกับคนที่สร้าง Studio หลายงานแล้ว</p>
-          <Link href="/brands" className="btn sm">ตั้ง Brand Voice →</Link>
+          <h3>{t("dashboard.lock_title")}</h3>
+          <p className="dim">{t("dashboard.lock_desc")}</p>
+          <Link href="/brands" className="btn sm">{t("dashboard.lock_cta")}</Link>
         </div>
       </div>
     </div>

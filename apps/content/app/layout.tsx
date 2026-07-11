@@ -5,6 +5,7 @@ import { getServerSupabase, isSupabaseConfigured } from "../lib/supabase-server"
 import { AccountFooter } from "./account-footer";
 import { HeaderActions } from "./HeaderActions";
 import { SidebarNav } from "./SidebarNav";
+import { LangProvider } from "./LangProvider";
 
 export const metadata: Metadata = {
   title: "Creator Studio — Content Engine",
@@ -22,23 +23,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="th">
       <body>
-        <HeaderActions />
-        <div className="shell">
-          <aside className="sidebar">
-            <Link href="/dashboard" className="nav-item" style={{ marginBottom: 6 }}>
-              <span className="t">⚡ Creator Studio</span>
-              <span className="s">Content Engine</span>
-            </Link>
-            <SidebarNav />
-            <div style={{ marginTop: "auto" }}>
-              <AccountFooter
-                configured={isSupabaseConfigured()}
-                email={account?.email ?? null}
-              />
-            </div>
-          </aside>
-          <main className="main">{children}</main>
-        </div>
+        <LangProvider>
+          <HeaderActions />
+          <div className="shell">
+            <aside className="sidebar">
+              <Link href="/dashboard" className="nav-item" style={{ marginBottom: 6 }}>
+                <span className="t">⚡ Creator Studio</span>
+                <span className="s">Content Engine</span>
+              </Link>
+              <SidebarNav />
+              <div style={{ marginTop: "auto" }}>
+                <AccountFooter
+                  configured={isSupabaseConfigured()}
+                  email={account?.email ?? null}
+                />
+              </div>
+            </aside>
+            <main className="main">{children}</main>
+          </div>
+        </LangProvider>
       </body>
     </html>
   );
