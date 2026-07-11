@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { browserClient, isSupabaseConfigured, type GenerationRow } from "@cs/db";
+import { browserClient, isSupabaseConfigured, type GenerationRow, type CampaignRow } from "@cs/db";
+import { TEMPLATE_CHIPS } from "@cs/prompts";
 
 const THAI_MONTHS = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
 const THAI_DOW = ["อา.","จ.","อ.","พ.","พฤ.","ศ.","ส."];
@@ -16,6 +17,7 @@ function ymd(d: Date): string {
 export default function CalendarPage() {
   const [cursor, setCursor] = useState(() => new Date());
   const [rows, setRows] = useState<GenerationRow[]>([]);
+  const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
 
@@ -33,6 +35,12 @@ export default function CalendarPage() {
       .order("created_at", { ascending: false })
       .limit(100);
     setRows((gens ?? []) as GenerationRow[]);
+    const { data: camps } = await db
+      .from("campaigns")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setCampaigns((camps ?? []) as CampaignRow[]);
   }
 
   useEffect(() => {
@@ -68,6 +76,32 @@ export default function CalendarPage() {
         <div className="card" style={{ borderColor: "var(--warn)" }}>
           <b>{isSupabaseConfigured() ? "ยังไม่ได้เข้าสู่ระบบ" : "ยังไม่ได้ตั้งค่า Supabase"}</b>
           {isSupabaseConfigured() && <div><Link href="/login?next=/calendar" className="btn primary" style={{ marginTop: 8 }}>เข้าสู่ระบบ</Link></div>}
+        </div>
+      )}
+
+      {signedIn && campaigns.length > 0 && (
+        <div className="card">
+          <h3>🗓️ แคมเปญ 7 วันที่บันทึกไว้</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+            {campaigns.map((c) => (
+              <div key={c.id} className="card" style={{ margin: 0 }}>
+                <b style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.topic}</b>
+                <div className="dim" style={{ fontSize: 12, margin: "4px 0" }}>
+                  {new Date(c.created_at).toLocaleDateString("th-TH")} · {c.days.length} วัน
+                </div>
+                <div className="chip-row" style={{ margin: "4px 0" }}>
+                  {c.days.slice(0, 3).map((d) => (
+                    <span key={d.day} className="pill" style={{ fontSize: 10.5 }}>{TEMPLATE_CHIPS[d.template]?.name_th ?? d.template}</span>
+                  ))}
+                  {c.days.length > 3 && <span className="dim" style={{ fontSize: 10.5 }}>+{c.days.length - 3}</span>}
+                </div>
+                <a href={`/studio?topic=${encodeURIComponent(c.days[0]?.topic_line ?? c.topic)}&template=${c.days[0]?.template ?? ""}`}
+                  className="btn sm" style={{ width: "100%", justifyContent: "center", marginTop: 6 }}>
+                  เริ่ม Day 1 →
+                </a>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

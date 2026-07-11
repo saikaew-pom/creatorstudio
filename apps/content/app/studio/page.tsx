@@ -2,17 +2,17 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { browserClient, isSupabaseConfigured, type BrandRow, type StyleRow } from "@cs/db";
-import type { ContentKit, Platform, TemplateChip } from "@cs/prompts";
+import { RECIPE_GROUPS, TEMPLATE_CHIPS, type ContentKit, type Platform, type TemplateChip } from "@cs/prompts";
+import { CampaignPanel } from "./CampaignPanel";
 
-const TEMPLATES: { key: TemplateChip; label: string }[] = [
-  { key: "portfolio", label: "💼 Portfolio งานที่ทำ" },
-  { key: "day_in_life", label: "📅 Day in the life" },
-  { key: "new_product", label: "✨ เปิดตัวสินค้าใหม่" },
-  { key: "honest_review", label: "⭐ รีวิวแบบจริงใจ" },
-  { key: "before_after", label: "🔄 Before-After" },
-  { key: "five_tips", label: "💡 เคล็ดลับ 5 ข้อ" },
-  { key: "promotion", label: "🔥 Promotion ลดราคา" },
-];
+// Per-chip icon (presentation only — TEMPLATE_CHIPS/RECIPE_GROUPS in @cs/prompts stay
+// the source of truth for names/structure/grouping; M15 "Content Recipes" redesign).
+const CHIP_ICONS: Record<TemplateChip, string> = {
+  portfolio: "💼", day_in_life: "📅", new_product: "✨", honest_review: "⭐",
+  before_after: "🔄", five_tips: "💡", promotion: "🔥",
+  sales_post: "🛍️", flash_sale: "⚡", customer_story: "💬",
+  myth_bust: "❌", how_to: "🧭", behind_scenes: "🎬", q_and_a: "❓",
+};
 const NICHES = ["ทั่วไป","ขายของออนไลน์","ร้านอาหาร","อสังหาริมทรัพย์","การเงิน-ลงทุน","สุขภาพ-ความงาม","การศึกษา-คอร์ส","ฟรีแลนซ์-บริการ","เกษตร-OTOP","ช่าง-รับเหมา","ท่องเที่ยว-โรงแรม","Personal Brand"];
 const PLATFORMS: { key: Platform; label: string }[] = [
   { key: "facebook", label: "Facebook" },
@@ -37,7 +37,12 @@ function StudioInner() {
   const params = useSearchParams();
   const [topic, setTopic] = useState(params.get("topic") ?? "");
   const [niche, setNiche] = useState("");
-  const [template, setTemplate] = useState<TemplateChip | undefined>();
+  // Deep-link from Campaign Mode's week grid ("สร้างโพสต์เต็ม →") pre-selects the
+  // day's recipe chip too, not just the topic — same param convention as ?topic=.
+  const [template, setTemplate] = useState<TemplateChip | undefined>(() => {
+    const t = params.get("template");
+    return t && t in TEMPLATE_CHIPS ? (t as TemplateChip) : undefined;
+  });
   const [platforms, setPlatforms] = useState<Platform[]>(["facebook"]);
   const [kit, setKit] = useState<ContentKit | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
@@ -159,15 +164,20 @@ function StudioInner() {
           placeholder='เช่น "AI ช่วย SME ไทยลดต้นทุน 70%" หรือ "5 เคล็ดลับโพสต์ FB ที่ไม่มีคน scroll ผ่าน"'
           value={topic} onChange={(e) => setTopic(e.target.value)}
         />
-        <div className="label">หรือเริ่มจากเทมเพลตที่ตรงกับธุรกิจคุณ:</div>
-        <div className="chip-row">
-          {TEMPLATES.map((t) => (
-            <button key={t.key} className={`chip ${template === t.key ? "on" : ""}`}
-              onClick={() => setTemplate(template === t.key ? undefined : t.key)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <div className="label">เลือกสูตรคอนเทนต์ตามเป้าหมาย <span className="dim">Pick a recipe by goal (ไม่บังคับ)</span></div>
+        {RECIPE_GROUPS.map((g) => (
+          <div key={g.group_th} style={{ marginBottom: 4 }}>
+            <div className="dim" style={{ fontSize: 12, margin: "6px 0 4px" }}>{g.icon} {g.group_th} · {g.group_en}</div>
+            <div className="chip-row" style={{ marginTop: 0 }}>
+              {g.chips.map((key) => (
+                <button key={key} className={`chip ${template === key ? "on" : ""}`}
+                  onClick={() => setTemplate(template === key ? undefined : key)}>
+                  {CHIP_ICONS[key]} {TEMPLATE_CHIPS[key].name_th}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
         <div className="label">ประเภทธุรกิจ / Niche <span className="dim">(ไม่บังคับ)</span></div>
         <input className="input" placeholder="ระบุประเภทธุรกิจของคุณ เช่น เกษตร, ที่ปรึกษา, Personal Brand"
           value={niche} onChange={(e) => setNiche(e.target.value)} />
@@ -218,6 +228,8 @@ function StudioInner() {
         </div>
         {error && <p style={{ color: "var(--danger)" }}>{error} · เครดิตไม่ถูกหัก ลองใหม่ได้เลย</p>}
       </div>
+
+      <CampaignPanel topic={topic} niche={niche} />
 
       {kit && (
         <>

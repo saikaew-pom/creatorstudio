@@ -44,8 +44,46 @@ export const TEMPLATE_CHIPS = {
     name_th: "Promotion ลดราคา",
     structure: "urgency จริง (เวลา/จำนวนจำกัด) → ของ/ราคา → วิธีรับสิทธิ์ 1-2-3 → CTA ด่วน",
   },
+  // M15: added so "ขาย/Sell" has a direct sales option (the borrowed 7-chip set had none).
+  sales_post: {
+    name_th: "โพสต์ขายตรงๆ",
+    structure: "hook เจ็บจริง → สินค้าแก้ยังไง (1 ย่อหน้า) → ราคา/โปรชัดเจน → ตอบ objection ที่พบบ่อย 1 ข้อ → CTA สั่งซื้อ + ช่องทางทัก",
+  },
+  flash_sale: {
+    name_th: "Flash Sale ด่วน",
+    structure: "เปิดด้วยเวลาจำกัด (นับถอยหลัง) → ของมีจำนวนจำกัดเท่าไร → ราคาเดิม/ราคาใหม่ → เงื่อนไขสั้น → CTA ตอนนี้",
+  },
+  customer_story: {
+    name_th: "เรื่องจริงจากลูกค้า",
+    structure: "quote ลูกค้า 1 ประโยคเปิด → ปัญหาก่อนใช้ → จุดเปลี่ยน → ผลลัพธ์วัดได้ → ชวนคนที่เจอปัญหาเดียวกันทัก",
+  },
+  myth_bust: {
+    name_th: "ความเชื่อผิดๆ",
+    structure: "ยกความเชื่อผิดที่คนในวงการพูดบ่อย → ทำไมผิด (เหตุผล/ตัวเลข) → ความจริงคืออะไร → สิ่งที่ควรทำแทน",
+  },
+  how_to: {
+    name_th: "สอนทำทีละขั้น",
+    structure: "ผลลัพธ์ที่จะได้ (ก่อน) → ของที่ต้องมี → ขั้นตอน 3-5 ขั้นเป็นข้อ → จุดพลาดบ่อย 1 ข้อ → CTA เซฟโพสต์",
+  },
+  behind_scenes: {
+    name_th: "เบื้องหลังงาน",
+    structure: "โชว์ขั้นตอนที่ลูกค้าไม่เคยเห็น → detail ที่ใส่ใจเป็นพิเศษ → ทำไมถึงทำแบบนี้ → เชื่อมกลับคุณภาพงาน",
+  },
+  q_and_a: {
+    name_th: "ตอบคำถามที่ถูกถามบ่อย",
+    structure: "คำถามจริงจากลูกค้า 1 ข้อเป็น hook → ตอบตรงๆ ละเอียด → ตัวอย่างประกอบ → ชวนถามต่อในคอมเมนต์",
+  },
 } as const;
 export type TemplateChip = keyof typeof TEMPLATE_CHIPS;
+
+// Goal groups for the "Content Recipes" UI (M15) — presentation grouping only,
+// doesn't affect the prompt (TEMPLATE_CHIPS above stays the source of truth).
+export const RECIPE_GROUPS: { group_th: string; group_en: string; icon: string; chips: TemplateChip[] }[] = [
+  { group_th: "ขาย", group_en: "Sell", icon: "🛒", chips: ["sales_post", "promotion", "new_product", "flash_sale"] },
+  { group_th: "สร้างความเชื่อใจ", group_en: "Build trust", icon: "🤝", chips: ["honest_review", "before_after", "portfolio", "customer_story"] },
+  { group_th: "ให้ความรู้", group_en: "Educate", icon: "📚", chips: ["five_tips", "myth_bust", "how_to"] },
+  { group_th: "สร้างตัวตน", group_en: "Personality", icon: "🎭", chips: ["day_in_life", "behind_scenes", "q_and_a"] },
+];
 
 // ---------- Input ----------
 export interface ContentKitInput {

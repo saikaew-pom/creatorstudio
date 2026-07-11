@@ -4,3 +4,4 @@ export * from "./image";
 export * from "./brand-style";
 export * from "./video";
 export * from "./templates";
+export * from "./campaign";

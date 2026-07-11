@@ -8,6 +8,7 @@ export * from "./templates";
 export * from "./projects";
 export * from "./mcp";
 export * from "./notifications";
+export * from "./campaigns";
 
 /** Daily free-quota limits per plan (doc 01 §9). Enforced via tryConsumeDailyUse. */
 export const DAILY_LIMITS: Record<string, number> = {
