@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 async function getAccount(): Promise<{ email: string | null } | null> {
   if (!isSupabaseConfigured()) return null;
   const { data } = await getServerSupabase().auth.getUser();
-  return data.user ? { email: data.user.email ?? null } : { email: null };
+  return data.user ? { email: data.user.email ?? null } : null;
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -26,19 +26,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <LangProvider>
           <HeaderActions />
           <div className="shell">
-            <aside className="sidebar">
-              <Link href="/dashboard" className="nav-item" style={{ marginBottom: 6 }}>
-                <span className="t">⚡ Creator Studio</span>
-                <span className="s">Content Engine</span>
-              </Link>
-              <SidebarNav />
-              <div style={{ marginTop: "auto" }}>
-                <AccountFooter
-                  configured={isSupabaseConfigured()}
-                  email={account?.email ?? null}
-                />
-              </div>
-            </aside>
+            {account && (
+              <aside className="sidebar">
+                <Link href="/dashboard" className="nav-item" style={{ marginBottom: 6 }}>
+                  <span className="t">⚡ Creator Studio</span>
+                  <span className="s">Content Engine</span>
+                </Link>
+                <SidebarNav />
+                <div style={{ marginTop: "auto" }}>
+                  <AccountFooter configured={isSupabaseConfigured()} email={account.email} />
+                </div>
+              </aside>
+            )}
             <main className="main">{children}</main>
           </div>
         </LangProvider>
