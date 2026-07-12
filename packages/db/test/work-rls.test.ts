@@ -70,12 +70,12 @@ async function actAs(uid: string) {
   await db.exec(`set app.uid = '${uid}';`);
 }
 
-// ---- Apply migrations 0001–0006, 0011, 0012 ----
+// ---- Apply migrations 0001–0006, 0011–0014 ----
 try {
-  for (const f of ["0001_init.sql", "0002_profile_bootstrap.sql", "0003_refund_rpc.sql", "0004_caption_broll_unique.sql", "0005_workspaces.sql", "0006_work.sql", "0011_security_hardening.sql", "0012_work_security_hardening.sql", "0013_reorder_task_null_status_fix.sql"]) {
+  for (const f of ["0001_init.sql", "0002_profile_bootstrap.sql", "0003_refund_rpc.sql", "0004_caption_broll_unique.sql", "0005_workspaces.sql", "0006_work.sql", "0011_security_hardening.sql", "0012_work_security_hardening.sql", "0013_reorder_task_null_status_fix.sql", "0014_task_data_integrity_checks.sql"]) {
     await db.exec(mig(f));
   }
-  check("migrations 0001–0006, 0011–0013 apply cleanly against real Postgres", true);
+  check("migrations 0001–0006, 0011–0014 apply cleanly against real Postgres", true);
 } catch (e) {
   check(`migrations apply cleanly — ERROR: ${(e as Error).message}`, false);
   console.log(`\n${pass} passed, ${fail} failed\n`);
@@ -184,6 +184,37 @@ const deleteAfterRemoval = await asAuthUser<number>(USER_B, `delete from task_co
 // campaigns-rls.test.ts's cross-user delete check.
 check("removed member cannot delete their own prior comment", deleteAfterRemoval.ok && deleteAfterRemoval.v === undefined);
 check("the comment row still exists", (await scalar<number>(`select count(*)::int as v from task_comments where id='${commentId}'`)) === 1);
+
+// ---- 0014 GATE: estimate_hours / date-range integrity is DB-enforced, not just app-layer ----
+console.log("\n== task data-integrity CHECK constraints (0014) ==");
+const negHours = await asAuthUser(
+  USER_A,
+  `insert into tasks (workspace_id, board_id, title, estimate_hours) values ('${wsA}','${boardA}','neg hours', -1) returning 1 as v`
+);
+check("negative estimate_hours is rejected by a DB CHECK constraint", negHours.ok === false);
+const invertedRange = await asAuthUser(
+  USER_A,
+  `insert into tasks (workspace_id, board_id, title, start_date, due_date) values ('${wsA}','${boardA}','inverted', '2026-08-15', '2026-08-01') returning 1 as v`
+);
+check("start_date > due_date is rejected by a DB CHECK constraint", invertedRange.ok === false);
+const validTask = await asAuthUser(
+  USER_A,
+  `insert into tasks (workspace_id, board_id, title, estimate_hours, start_date, due_date) values ('${wsA}','${boardA}','valid', 2.5, '2026-08-01', '2026-08-15') returning 1 as v`
+);
+check("a valid estimate + date range still inserts fine", validTask.ok === true);
+const nullsOk = await asAuthUser(
+  USER_A,
+  `insert into tasks (workspace_id, board_id, title) values ('${wsA}','${boardA}','no dates or estimate') returning 1 as v`
+);
+check("omitting estimate_hours/dates (NULL) still inserts fine", nullsOk.ok === true);
+const badUpdate = await asAuthUser(
+  USER_A,
+  `update tasks set due_date = '2026-01-01' where id = '${task1}' returning 1 as v`
+);
+// task1 has no start_date set in this suite, so this specific update is just a
+// smoke check that the constraint doesn't fire on a NULL start_date; the real
+// inversion case is covered by validTask/invertedRange above via matched pairs.
+check("editing due_date alone (no start_date set) still succeeds", badUpdate.ok === true);
 
 // ---- RLS present ----
 console.log("\n== RLS present on new tables ==");

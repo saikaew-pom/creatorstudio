@@ -15,6 +15,7 @@ import { todayIsoBangkok } from "../../../lib/dates";
 // change onto the same position=1000 as fresh tasks and any other list-driven move.
 export function ListView({ tasks, onOpenTask, onTaskUpdated }: TaskViewProps) {
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   const byStatus: Record<TaskStatus, TaskRow[]> = {
     todo: [], in_progress: [], blocked: [], done: [],
@@ -25,6 +26,7 @@ export function ListView({ tasks, onOpenTask, onTaskUpdated }: TaskViewProps) {
   async function changeStatus(task: TaskRow, status: TaskStatus) {
     if (status === task.status) return;
     setSavingId(task.id);
+    setErr(null);
     try {
       const targetColumn = byStatus[status];
       const lastInTarget = targetColumn.length ? targetColumn[targetColumn.length - 1].id : null;
@@ -33,7 +35,12 @@ export function ListView({ tasks, onOpenTask, onTaskUpdated }: TaskViewProps) {
         body: JSON.stringify({ status, prevId: lastInTarget, nextId: null }),
       });
       const json = await res.json();
+      // On failure the <select> is still bound to `value={task.status}` (the
+      // parent's unchanged state), so it snaps back to the real value on its
+      // own — but silently, with no indication of WHY the change didn't
+      // stick, unless the error is actually surfaced here.
       if (res.ok) onTaskUpdated(task.id, { status, position: json.position });
+      else setErr(json.error ?? "เปลี่ยนสถานะไม่สำเร็จ");
     } finally {
       setSavingId(null);
     }
@@ -60,6 +67,7 @@ export function ListView({ tasks, onOpenTask, onTaskUpdated }: TaskViewProps) {
 
   return (
     <div>
+      {err && <p style={{ color: "var(--danger)", marginBottom: 8 }}>{err}</p>}
       {STATUS_ORDER.map((status) => {
         const list = byStatus[status];
         return (

@@ -16,19 +16,33 @@ function ymd(d: Date): string {
 // Calendar view — placed by due_date, drag-to-date via the same plain-HTML5-DnD
 // technique as apps/content's calendar (no DnD library, no shared UI package
 // between the two Next.js apps, so the month-grid helpers are reimplemented here).
-export function CalendarView({ tasks, onOpenTask, onTaskUpdated }: TaskViewProps) {
+export function CalendarView({ tasks, onOpenTask, onTaskUpdated, reload }: TaskViewProps) {
   const [cursor, setCursor] = useState(() => new Date());
   const [dragId, setDragId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   async function assignDate(taskId: string, date: string | null) {
     setBusy(true);
+    setErr(null);
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ due_date: date }),
       });
-      if (res.ok) onTaskUpdated(taskId, { due_date: date });
+      if (res.ok) {
+        onTaskUpdated(taskId, { due_date: date });
+      } else {
+        // e.g. the new due_date would land before the task's own start_date —
+        // the drag already "landed" visually, so without this the task
+        // silently stays put with zero feedback. reload() re-syncs the real
+        // due_date from the server (the drag itself never optimistically
+        // moved local state, but this keeps the recovery path identical to
+        // BoardView's).
+        const json = await res.json().catch(() => ({}));
+        setErr(json.error ?? "ย้ายวันที่ไม่สำเร็จ");
+        reload();
+      }
     } finally {
       setBusy(false);
       setDragId(null);
@@ -47,6 +61,7 @@ export function CalendarView({ tasks, onOpenTask, onTaskUpdated }: TaskViewProps
 
   return (
     <div>
+      {err && <p style={{ color: "var(--danger)", marginBottom: 8 }}>{err}</p>}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
         <button className="btn sm" onClick={() => setCursor(new Date(year, month - 1, 1))}>‹</button>
         <b>{THAI_MONTHS[month]} {toBuddhistYear(year)}</b>

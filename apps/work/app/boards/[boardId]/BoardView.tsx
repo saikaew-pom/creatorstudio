@@ -8,9 +8,10 @@ import type { TaskViewProps } from "./BoardShell";
 // same technique as apps/content's calendar drag (no DnD library in this codebase).
 // Dropping ON a card places the dragged task immediately BEFORE it in that
 // column; dropping on the column body (below the last card) appends to the end.
-export function BoardView({ tasks, onOpenTask, onTaskUpdated }: TaskViewProps) {
+export function BoardView({ tasks, onOpenTask, onTaskUpdated, reload }: TaskViewProps) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const byStatus: Record<TaskStatus, TaskRow[]> = {
     todo: [], in_progress: [], blocked: [], done: [],
@@ -21,13 +22,23 @@ export function BoardView({ tasks, onOpenTask, onTaskUpdated }: TaskViewProps) {
   async function moveTo(status: TaskStatus, prevId: string | null, nextId: string | null) {
     if (!dragId) return;
     setBusy(true);
+    setErr(null);
     try {
       const res = await fetch(`/api/tasks/${dragId}/reorder`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, prevId, nextId }),
       });
       const json = await res.json();
-      if (res.ok) onTaskUpdated(dragId, { status, position: json.position });
+      if (res.ok) {
+        onTaskUpdated(dragId, { status, position: json.position });
+      } else {
+        // The card already visually "dropped" via HTML5 DnD before this
+        // request resolved — on failure it must snap back to its real
+        // position, not sit wherever the browser left it. reload() re-fetches
+        // the board's actual state (same recovery `err` needs anyway).
+        setErr(json.error ?? "ย้ายงานไม่สำเร็จ");
+        reload();
+      }
     } finally {
       setBusy(false);
       setDragId(null);
@@ -35,7 +46,9 @@ export function BoardView({ tasks, onOpenTask, onTaskUpdated }: TaskViewProps) {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${STATUS_ORDER.length}, 1fr)`, gap: 12 }}>
+    <div>
+      {err && <p style={{ color: "var(--danger)", marginBottom: 8 }}>{err}</p>}
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${STATUS_ORDER.length}, 1fr)`, gap: 12 }}>
       {STATUS_ORDER.map((status) => {
         const list = byStatus[status];
         return (
@@ -77,6 +90,7 @@ export function BoardView({ tasks, onOpenTask, onTaskUpdated }: TaskViewProps) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
