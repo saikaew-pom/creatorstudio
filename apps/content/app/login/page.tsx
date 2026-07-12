@@ -3,6 +3,17 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { browserClient, isSupabaseConfigured } from "@cs/db";
 
+// Only ever redirect same-origin: reject protocol-relative ("//host"),
+// absolute ("https://host"), and backslash forms (some browsers treat "\" as
+// "/", so "/\evil.com" can resolve as "//evil.com") — anything else falls
+// back to the dashboard rather than letting `next` send the user off-site.
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("://") || raw.includes("\\")) {
+    return "/dashboard";
+  }
+  return raw;
+}
+
 function LoginInner() {
   const params = useSearchParams();
   const [email, setEmail] = useState("");
@@ -11,7 +22,7 @@ function LoginInner() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const next = params.get("next") ?? "/dashboard";
+  const next = safeNext(params.get("next"));
 
   const configured = isSupabaseConfigured();
 

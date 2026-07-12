@@ -3,12 +3,15 @@
 Handover spec for executing models (Opus/Sonnet). Target app: **`apps/content`**
 (live: creatorstudio99.vercel.app). Four goals, in build order:
 
-| Milestone | Goal |
-|---|---|
-| M14 | Notion-style UI redesign (clean professional SaaS) |
-| M15 | Repurpose & differentiate — template system → "Content Recipes" + Campaign Mode |
-| M16 | Bilingual UI (TH/EN) via static i18n dictionary |
-| M17 | Settings page: Profile · API Keys (BYO, server-side) · Agent/MCP |
+| Milestone | Goal | Status |
+|---|---|---|
+| M14 | Notion-style UI redesign (clean professional SaaS) | [DONE] |
+| M15 | Repurpose & differentiate — template system → "Content Recipes" + Campaign Mode | [DONE] |
+| M16 | Bilingual UI (TH/EN) via static i18n dictionary | [DONE] |
+| M17 | Settings page: Profile · API Keys (BYO, server-side) · Agent/MCP | [DONE] |
+
+**All four milestones are built and committed** — `72ef281` (M14), `29779cf` (M15),
+`231d592` (M16), `21df84e` (M17). Nothing pending in this doc.
 
 ---
 
@@ -43,7 +46,7 @@ rules exactly:
 
 ---
 
-## M14 — Notion-style UI redesign
+## M14 — Notion-style UI redesign [DONE]
 
 ### Design direction
 
@@ -106,7 +109,7 @@ tokens. **No logic changes in M14 — style only.** Screenshot each page before/
 
 ---
 
-## M15 — Repurpose & differentiate ("not copy & paste")
+## M15 — Repurpose & differentiate ("not copy & paste") [DONE]
 
 Two moves: restructure the template UX (the borrowed-looking part), and add one
 signature feature Hero AI doesn't have.
@@ -195,7 +198,7 @@ credits debited once, RLS test proves another user can't read it.
 
 ---
 
-## M16 — Bilingual UI (TH/EN)
+## M16 — Bilingual UI (TH/EN) [DONE]
 
 **Decision: static dictionary, NOT live MiniMax translation.** Live MT on every
 render is slow, costs per pageview, and produces inconsistent terminology. Use
@@ -226,7 +229,7 @@ break (EN strings are often longer — check chip wrapping); refresh preserves c
 
 ---
 
-## M17 — Settings page (content app): Profile · API Keys · Agent/MCP
+## M17 — Settings page (content app): Profile · API Keys · Agent/MCP [DONE]
 
 The studio app already has all three patterns — **port, don't reinvent**:
 - Tabs shell: copy `apps/studio/app/settings/SettingsTabs.tsx` structure.
