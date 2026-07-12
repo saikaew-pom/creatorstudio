@@ -546,14 +546,42 @@ see an over-allocated member flagged in Workload [DONE]; activity log shows each
 [DONE] — all verified live against the real hosted Supabase project, test data cleaned up after.
 27/27 work-rls + 132/132 total DB-suite tests green; full monorepo typecheck clean.
 
-### M11 — CRM: pipeline, contacts, deals, deliverables (3 days) ⭐
-Tables 0007 + seed stages; companies/contacts CRUD; deal pipeline kanban (drag = stage move +
-audited); deal detail with activity timeline; deliverables checklist linking to a real `generation`
-or `project` via the server bridge route.
-**Accept**: create a sponsor + contact + deal; drag it prospect→negotiating (a `stage_change`
-activity appears); attach a deliverable pointing at a content kit you generated in `apps/content` and
-see its live status/thumbnail render through the bridge (no cross-tenant RLS read); funnel totals
-update.
+### M11 — CRM: pipeline, contacts, deals, deliverables (3 days) ⭐ [DONE]
+Tables `0015_crm.sql` (companies/contacts/deal_stages/deals/deal_activities/deliverables) + seed
+stages; `packages/db/src/crm.ts` DB wrapper; companies/contacts CRUD; deal pipeline kanban (drag =
+stage move via `reorder_deal`, audited stage_change/amount_change activity); deal detail with
+activity timeline; deliverables checklist linking to a real `generation`/`project` via the studio↔CRM
+bridge route (`/api/deliverables/[id]/preview`, service-role read after `is_ws_member`, never a
+direct client cross-tenant RLS read).
+
+Built the schema/DB-wrapper/bridge-route/kanban directly (with every M9/M10 hardening lesson baked
+in from day one — column-privilege locks, coalesce-safe checks, composite FKs), fanned
+companies/contacts pages + the deal detail page out to parallel agents, then ran **three** review
+passes: a custom adversarial workflow found **one CRITICAL** issue — `deliverables.generation_id`/
+`project_id`/`owner_user_id` were client-writable at the DB level with zero ownership check, so a
+direct Supabase REST call (bypassing the Next.js app entirely) could re-target any deliverable at
+**another user's private generation/project** and then read its metadata through the very bridge
+route meant to be the one sanctioned crossing point — plus a same-class cross-workspace
+company/contact/task-linking gap. Both closed in `0016_crm_security_hardening.sql` (a
+caller-must-own-the-asset trigger + composite FKs matching `stage_id`'s existing pattern). A follow-up
+`code-reviewer` pass then found two more real bugs the first two rounds missed: a deliverable
+re-link route that silently swallowed DB errors/no-op writes and always reported success, and a
+missing prop-resync effect on `ContactRowItem` (built by a different agent than its `CompanyRowItem`
+sibling) that let a trimmed field go stale in the UI. All fixed and verified.
+
+**Accept**: create a sponsor + contact + deal [DONE]; drag it prospect→negotiating (a `stage_change`
+activity appears) [DONE]; attach a deliverable pointing at a content kit and see its live
+status/thumbnail render through the bridge (no cross-tenant RLS read) [DONE — the critical fix was
+verified live against the real hosted Supabase project: a direct REST attack attempting to link a
+victim's private generation was rejected with "generation not found or not owned by caller", while
+linking one's own asset the same way succeeded]; funnel totals update [DONE]. 49/49 crm-rls tests
+green (regression coverage for both the critical fix and the composite-FK fix, including a live
+PGlite repro proving each exploit was real pre-fix), ~190/190 across the full DB suite, full monorepo
+typecheck clean.
+
+Known minor gap, deferred as a scope call not a bug: `crm_contacts.notes` exists in the schema/types
+but has no UI and isn't forwarded by the PATCH route — companies have full notes support, contacts
+don't yet.
 
 ### M12 — AI assistant + automations (2 days)
 `work.*`/`crm.*` prompt modules through `packages/ai` (timeouts); draft→commit buttons writing

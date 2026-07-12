@@ -9,15 +9,14 @@ const NAV = [
 
 // M10 lands boards/workload; List/Calendar/Gantt are view tabs INSIDE a board
 // (docs/07 §2 — same tasks table, different client), not separate nav entries.
+// M11 lands the CRM entries below (deal pipeline is the primary CRM surface,
+// companies/contacts are its supporting lists).
 const WORK_NAV = [
   { href: "/boards", t: "บอร์ดงาน", icon: "▦" },
   { href: "/workload", t: "ภาระงาน", icon: "⚖" },
-];
-
-// M11 lands the real route; until then this is a visible-but-inert proof that
-// entitlement flips nav on/off (docs/07 §9 M9 accept: "no nav entry" without work_crm).
-const COMING_SOON = [
-  { t: "ดีล/สปอนเซอร์", icon: "🤝" },
+  { href: "/crm/deals", t: "ดีล/สปอนเซอร์", icon: "🤝" },
+  { href: "/crm/companies", t: "บริษัท", icon: "🏢" },
+  { href: "/crm/contacts", t: "ผู้ติดต่อ", icon: "👤" },
 ];
 
 export function SidebarNav({ entitled, isAdmin }: { entitled: boolean; isAdmin: boolean }) {
@@ -48,13 +47,6 @@ export function SidebarNav({ entitled, isAdmin }: { entitled: boolean; isAdmin: 
               </Link>
             );
           })}
-          {COMING_SOON.map((i) => (
-            <div key={i.t} className="nav-item" style={{ flexDirection: "row", alignItems: "center", gap: 10, opacity: 0.45, cursor: "default" }}>
-              <span style={{ width: 18, textAlign: "center" }}>{i.icon}</span>
-              <span className="t">{i.t}</span>
-              <span className="s" style={{ marginLeft: "auto" }}>เร็วๆ นี้</span>
-            </div>
-          ))}
         </>
       )}
 
