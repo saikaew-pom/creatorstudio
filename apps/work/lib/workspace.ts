@@ -3,6 +3,7 @@
 // — membership is re-checked against the DB on every read anyway via RLS/ws_role, so
 // the cookie is just "which of my workspaces am I looking at", never a trust boundary).
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import {
   getMyRole, hasFeature, listMyWorkspaces, type MyWorkspace,
 } from "@cs/db";
@@ -77,4 +78,20 @@ export async function requireFeature(feature: string): Promise<FeatureGate> {
 export async function getCurrentRole(wsId: string): Promise<string | null> {
   const db = getServerSupabase();
   return getMyRole(db, wsId);
+}
+
+/** requireFeature() for API routes: null when entitled (proceed), otherwise the
+ * 401/403 response to return immediately — the M9 accept criterion ("a workspace
+ * without work_crm gets 403 from every /api/work|crm route") that M10 fulfills by
+ * actually having such routes to gate. */
+export async function requireFeatureRoute(
+  feature: string
+): Promise<{ active: ActiveWorkspace; response: null } | { active: null; response: NextResponse }> {
+  const gate = await requireFeature(feature);
+  if (gate.kind === "ok") return { active: gate.active, response: null };
+  if (gate.kind === "signed-out")
+    return { active: null, response: NextResponse.json({ error: "กรุณาเข้าสู่ระบบก่อน" }, { status: 401 }) };
+  if (gate.kind === "no-workspace")
+    return { active: null, response: NextResponse.json({ error: "ไม่พบ workspace ของคุณ" }, { status: 403 }) };
+  return { active: null, response: NextResponse.json({ error: "workspace นี้ยังไม่เปิดใช้งาน Work + CRM" }, { status: 403 }) };
 }

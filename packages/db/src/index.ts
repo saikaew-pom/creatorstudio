@@ -11,6 +11,7 @@ export * from "./notifications";
 export * from "./campaigns";
 export * from "./api-keys";
 export * from "./workspaces";
+export * from "./work";
 
 /** Daily free-quota limits per plan (doc 01 §9). Enforced via tryConsumeDailyUse. */
 export const DAILY_LIMITS: Record<string, number> = {

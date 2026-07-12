@@ -72,10 +72,10 @@ async function actAs(uid: string) {
 
 // ---- Apply migrations 0001–0006, 0011, 0012 ----
 try {
-  for (const f of ["0001_init.sql", "0002_profile_bootstrap.sql", "0003_refund_rpc.sql", "0004_caption_broll_unique.sql", "0005_workspaces.sql", "0006_work.sql", "0011_security_hardening.sql", "0012_work_security_hardening.sql"]) {
+  for (const f of ["0001_init.sql", "0002_profile_bootstrap.sql", "0003_refund_rpc.sql", "0004_caption_broll_unique.sql", "0005_workspaces.sql", "0006_work.sql", "0011_security_hardening.sql", "0012_work_security_hardening.sql", "0013_reorder_task_null_status_fix.sql"]) {
     await db.exec(mig(f));
   }
-  check("migrations 0001–0006, 0011, 0012 apply cleanly against real Postgres", true);
+  check("migrations 0001–0006, 0011–0013 apply cleanly against real Postgres", true);
 } catch (e) {
   check(`migrations apply cleanly — ERROR: ${(e as Error).message}`, false);
   console.log(`\n${pass} passed, ${fail} failed\n`);
@@ -144,6 +144,12 @@ check("reorder moved task3 to status in_progress",
   (await scalar<string>(`select status as v from tasks where id='${task3}'`)) === "in_progress");
 const reorderByOutsider = await asAuthUser(USER_C, `select reorder_task('${task1}','done',null,null) as v`);
 check("outsider cannot reorder A's task (raises)", reorderByOutsider.ok === false);
+
+// ---- 0013 GATE: null status is rejected cleanly, not silently accepted ----
+console.log("\n== reorder_task rejects a null status (0013) ==");
+const reorderNullStatus = await asAuthUser(USER_A, `select reorder_task('${task1}',null,null,null) as v`);
+check("null status raises 'invalid status', not silently accepted", reorderNullStatus.ok === false);
+check("task1's status is unchanged", (await scalar<string>(`select status as v from tasks where id='${task1}'`)) !== null);
 
 // ---- Audit trail ----
 console.log("\n== task_activity audit trail ==");

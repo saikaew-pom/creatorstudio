@@ -515,14 +515,36 @@ provider) with a shareable-link fallback when the invitee already has an account
 workspace rows [DONE]; a workspace without `work_crm` shows no Work+CRM nav group and the dashboard
 renders a locked state [DONE — verified live: create workspace → invite → accept → admin grant →
 nav/dashboard flip, end to end against the real hosted Supabase project, test data cleaned up
-after]. `/api/work|crm` routes themselves don't exist yet — that 403 check lands with M10/M11.
+after]. `/api/work|crm` routes now exist (M10) and every one of them 403s a non-entitled workspace
+via `requireFeatureRoute` [DONE].
 
-### M10 — Work: tasks + the four views + workload (2.5 days)
-Boards/tasks 0006; List, Board (drag→status via reorder RPC), Calendar (reuse content-calendar drag),
-Gantt (bars, no deps yet); Workload aggregate; comments + activity timeline; assignee = member picker.
+### M10 — Work: tasks + the four views + workload (2.5 days) [DONE]
+Boards/tasks 0006 (already live); `packages/db/src/work.ts` DB wrapper; List, Board (kanban,
+drag→status via reorder RPC), Calendar (drag-to-date, reusing the content-calendar drag technique),
+Gantt (read-only bars, no dependency arrows — that's the §9 backlog item) — all four as tabs on one
+`/boards/[boardId]` shell reading the same tasks; `/workload` page (weekly window vs
+`workspace_members.capacity_hours`); task detail slide-over with comments + activity timeline;
+assignee = member picker.
+
+Built foundation + flagship kanban view directly, then fanned the other 3 views + Workload out to
+parallel agents against the shared DB wrapper/component contract, then ran an adversarial review
+pass (13 findings, all confirmed, no criticals) and fixed all of them: two independent drag-race
+conditions (BoardView + CalendarView, each built by a different pass, made the same mistake —
+`busy`/`dragId` weren't actually guarding a second drag from starting mid-flight); two independent
+UTC-vs-Bangkok timezone bugs (Workload's default week window, List's overdue flag) — added
+`lib/dates.ts`; List's status-change was silently colliding every reordered task onto
+position=1000 instead of appending; the reorder route leaked raw RPC error text (a cross-tenant
+task-existence oracle); `estimate_hours` and `start_date ≤ due_date` had no validation anywhere
+(migration-level, API-level, or client-level); TaskDetailPanel's date/hours inputs were
+uncontrolled (`defaultValue`), so they never actually reset when switching tasks. Migration 0013
+closes the same NULL-unsafe-check bug class (already fixed twice in 0005) in `reorder_task`'s
+status validation.
+
 **Accept**: create a board, add tasks, drag across kanban columns (status + order persist and survive
-reload), place one on the calendar by drag, see a Gantt bar span start→due, and see an over-allocated
-member flagged in Workload; activity log shows each status change.
+reload) [DONE], place one on the calendar by drag [DONE], see a Gantt bar span start→due [DONE], and
+see an over-allocated member flagged in Workload [DONE]; activity log shows each status change
+[DONE] — all verified live against the real hosted Supabase project, test data cleaned up after.
+27/27 work-rls + 132/132 total DB-suite tests green; full monorepo typecheck clean.
 
 ### M11 — CRM: pipeline, contacts, deals, deliverables (3 days) ⭐
 Tables 0007 + seed stages; companies/contacts CRUD; deal pipeline kanban (drag = stage move +
