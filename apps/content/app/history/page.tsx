@@ -116,7 +116,7 @@ export default function HistoryPage() {
                   </button>
                 )}
                 {g.type === "content_kit" && (
-                  <Link href={`/studio?topic=${encodeURIComponent(g.title ?? "")}`} className="btn sm" style={{ marginTop: 8, width: "100%", justifyContent: "center" }}>
+                  <Link href={`/studio?jobId=${g.id}`} className="btn sm" style={{ marginTop: 8, width: "100%", justifyContent: "center" }}>
                     เปิดดู →
                   </Link>
                 )}

@@ -15,77 +15,108 @@ import {
 } from "./shared";
 
 // ---------- Template chips (§A.4) ----------
+// topic_hint_th/en: shown as the topic textarea's placeholder once this chip is
+// selected — tells the user exactly what to fill in for this recipe (presentation
+// only, doesn't reach the prompt; `structure` above is what the model actually uses).
 export const TEMPLATE_CHIPS = {
   portfolio: {
     name_th: "Portfolio งานที่ทำ",
     name_en: "Portfolio showcase",
     structure: "เล่าเคสงานจริง 1 ชิ้น: โจทย์ → วิธีทำ → ผลลัพธ์ → บทเรียน ปิดด้วยชวนคุยงาน",
+    topic_hint_th: "งานที่ทำให้ลูกค้า — ใส่ชื่อโปรเจกต์ · โจทย์ที่ต้องแก้ · ผลลัพธ์ที่ได้",
+    topic_hint_en: "A project I did for a client — name it · the problem · the result",
   },
   day_in_life: {
     name_th: "Day in the life",
     name_en: "Day in the life",
     structure: "เล่า 1 วันของเจ้าของ/ทีมแบบ behind-the-scenes มี timestamp เช้า-เย็น จบด้วย insight",
+    topic_hint_th: "หนึ่งวันทำงานของฉัน — ใส่สิ่งที่ทำตั้งแต่เช้าถึงเย็น · โมเมนต์เด่นของวัน",
+    topic_hint_en: "A day in my work — what I do morning to night · one standout moment",
   },
   new_product: {
     name_th: "เปิดตัวสินค้าใหม่",
     name_en: "New product launch",
     structure: "tease pain → เปิดตัว → 3 จุดเด่น → โปรเปิดตัว → CTA สั่งซื้อ",
+    topic_hint_th: "เปิดตัวสินค้าใหม่ของฉัน — ใส่ชื่อสินค้า · จุดเด่น · กลุ่มลูกค้าที่ใช่",
+    topic_hint_en: "My new product launch — product name · key feature · target customer",
   },
   honest_review: {
     name_th: "รีวิวแบบจริงใจ",
     name_en: "Honest review",
     structure: "รีวิวตรงไปตรงมา มีทั้งข้อดีและข้อจำกัด สร้างความน่าเชื่อถือ จบด้วยเหมาะกับใคร",
+    topic_hint_th: "รีวิวสินค้า/บริการที่ฉันใช้จริง — ใส่ชื่อสินค้า · ข้อดี · ข้อจำกัด",
+    topic_hint_en: "A product/service I actually used — name it · the good · the limits",
   },
   before_after: {
     name_th: "Before-After",
     name_en: "Before-After",
     structure: "ภาพก่อน/หลังชัดเจน เล่า transformation เป็นขั้น ห้ามเคลมเกินจริง",
+    topic_hint_th: "การเปลี่ยนแปลงก่อน-หลังของฉัน — ใส่สภาพก่อน · สิ่งที่ทำ · ผลลัพธ์หลัง",
+    topic_hint_en: "My before-after transformation — starting point · what I did · the result",
   },
   five_tips: {
     name_th: "เคล็ดลับ 5 ข้อ",
     name_en: "5 quick tips",
     structure: "ลิสต์ 5 ข้อ actionable ข้อละ 1-2 ประโยค ข้อสุดท้ายเก็บทีเด็ด จบชวน save",
+    topic_hint_th: "เคล็ดลับในวงการของฉัน — ใส่หัวข้อ/ปัญหาที่คนมักเจอ",
+    topic_hint_en: "Tips from my field — the topic or problem people usually run into",
   },
   promotion: {
     name_th: "Promotion ลดราคา",
     name_en: "Promotion / discount",
     structure: "urgency จริง (เวลา/จำนวนจำกัด) → ของ/ราคา → วิธีรับสิทธิ์ 1-2-3 → CTA ด่วน",
+    topic_hint_th: "โปรโมชั่นของฉัน — ใส่ชื่อสินค้า · ส่วนลด/ของแถม · ระยะเวลา",
+    topic_hint_en: "My promotion — product name · discount/gift · how long it runs",
   },
   // M15: added so "ขาย/Sell" has a direct sales option (the borrowed 7-chip set had none).
   sales_post: {
     name_th: "โพสต์ขายตรงๆ",
     name_en: "Direct sales post",
     structure: "hook เจ็บจริง → สินค้าแก้ยังไง (1 ย่อหน้า) → ราคา/โปรชัดเจน → ตอบ objection ที่พบบ่อย 1 ข้อ → CTA สั่งซื้อ + ช่องทางทัก",
+    topic_hint_th: "โพสต์ขายของฉัน — ใส่ชื่อสินค้า · ราคา · ปัญหาที่ช่วยแก้",
+    topic_hint_en: "My sales post — product name · price · the problem it solves",
   },
   flash_sale: {
     name_th: "Flash Sale ด่วน",
     name_en: "Flash sale",
     structure: "เปิดด้วยเวลาจำกัด (นับถอยหลัง) → ของมีจำนวนจำกัดเท่าไร → ราคาเดิม/ราคาใหม่ → เงื่อนไขสั้น → CTA ตอนนี้",
+    topic_hint_th: "Flash Sale ของฉัน — ใส่สินค้า · ราคาลด · เวลาปิดดีล",
+    topic_hint_en: "My flash sale — product · discounted price · when it ends",
   },
   customer_story: {
     name_th: "เรื่องจริงจากลูกค้า",
     name_en: "Customer story",
     structure: "quote ลูกค้า 1 ประโยคเปิด → ปัญหาก่อนใช้ → จุดเปลี่ยน → ผลลัพธ์วัดได้ → ชวนคนที่เจอปัญหาเดียวกันทัก",
+    topic_hint_th: "เรื่องราวลูกค้าของฉัน — ใส่ปัญหาที่ลูกค้าเจอ · ผลลัพธ์หลังใช้",
+    topic_hint_en: "A customer's story — the problem they had · the result after using it",
   },
   myth_bust: {
     name_th: "ความเชื่อผิดๆ",
     name_en: "Myth-busting",
     structure: "ยกความเชื่อผิดที่คนในวงการพูดบ่อย → ทำไมผิด (เหตุผล/ตัวเลข) → ความจริงคืออะไร → สิ่งที่ควรทำแทน",
+    topic_hint_th: "ความเชื่อผิดๆ ในวงการของฉัน — ใส่ความเชื่อที่คนพูดผิด · ความจริง",
+    topic_hint_en: "A myth in my industry — the false belief · what's actually true",
   },
   how_to: {
     name_th: "สอนทำทีละขั้น",
     name_en: "Step-by-step how-to",
     structure: "ผลลัพธ์ที่จะได้ (ก่อน) → ของที่ต้องมี → ขั้นตอน 3-5 ขั้นเป็นข้อ → จุดพลาดบ่อย 1 ข้อ → CTA เซฟโพสต์",
+    topic_hint_th: "วิธีทำทีละขั้นของฉัน — ใส่ผลลัพธ์ที่จะได้ · ขั้นตอนหลัก",
+    topic_hint_en: "My step-by-step guide — the end result · the main steps",
   },
   behind_scenes: {
     name_th: "เบื้องหลังงาน",
     name_en: "Behind the scenes",
     structure: "โชว์ขั้นตอนที่ลูกค้าไม่เคยเห็น → detail ที่ใส่ใจเป็นพิเศษ → ทำไมถึงทำแบบนี้ → เชื่อมกลับคุณภาพงาน",
+    topic_hint_th: "เบื้องหลังงานของฉัน — ใส่ขั้นตอนที่ลูกค้าไม่เคยเห็น",
+    topic_hint_en: "Behind the scenes of my work — the steps customers never see",
   },
   q_and_a: {
     name_th: "ตอบคำถามที่ถูกถามบ่อย",
     name_en: "FAQ answered",
     structure: "คำถามจริงจากลูกค้า 1 ข้อเป็น hook → ตอบตรงๆ ละเอียด → ตัวอย่างประกอบ → ชวนถามต่อในคอมเมนต์",
+    topic_hint_th: "คำถามที่ลูกค้าถามบ่อยของฉัน — ใส่คำถามจริง · คำตอบสั้นๆ",
+    topic_hint_en: "A question customers ask me a lot — the real question · a short answer",
   },
 } as const;
 export type TemplateChip = keyof typeof TEMPLATE_CHIPS;

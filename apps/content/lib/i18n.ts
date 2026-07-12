@@ -131,6 +131,22 @@ export const STRINGS = {
     en: 'e.g. "AI helps Thai SMEs cut costs 70%" or "5 FB post tips nobody scrolls past"',
   },
   "studio.recipes_label": { th: "เลือกสูตรคอนเทนต์ตามเป้าหมาย", en: "Pick a recipe by goal" },
+  "studio.brainstorm_btn": { th: "💡 ขอ AI ช่วยคิดไอเดีย", en: "💡 Ask AI for ideas" },
+  "studio.brainstorm_hint": {
+    th: "พิมพ์หัวข้อหรือ niche สักหน่อย เพื่อให้ AI ต่อยอดให้",
+    en: "Type a topic or niche and let AI build on it",
+  },
+  "studio.brainstorm_loading": { th: "กำลังคิดไอเดีย…", en: "Thinking of ideas…" },
+  "studio.brainstorm_pick": { th: "เลือกไอเดียเพื่อใส่ในหัวข้อ", en: "Pick an idea to use as your topic" },
+  "studio.loading_saved": { th: "กำลังโหลดคอนเทนต์ที่บันทึกไว้…", en: "Loading your saved content…" },
+  "studio.load_saved_not_found": {
+    th: "ไม่พบคอนเทนต์ที่บันทึกไว้ — อาจถูกลบไปแล้ว ลองสร้างใหม่ได้เลย",
+    en: "Couldn't find that saved content — it may have been deleted. Feel free to generate something new.",
+  },
+  "studio.load_saved_error": {
+    th: "โหลดคอนเทนต์ที่บันทึกไว้ไม่สำเร็จ ลองรีเฟรชหน้านี้อีกครั้ง",
+    en: "Couldn't load your saved content. Try refreshing the page.",
+  },
   "studio.niche_label": { th: "ประเภทธุรกิจ / Niche", en: "Business type / Niche" },
   "studio.niche_optional": { th: "(ไม่บังคับ)", en: "(optional)" },
   "studio.niche_placeholder": {

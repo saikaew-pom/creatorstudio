@@ -1,8 +1,8 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { browserClient, isSupabaseConfigured, type BrandRow, type StyleRow } from "@cs/db";
-import { RECIPE_GROUPS, TEMPLATE_CHIPS, type ContentKit, type Platform, type TemplateChip } from "@cs/prompts";
+import { browserClient, getGeneration, isSupabaseConfigured, type BrandRow, type StyleRow } from "@cs/db";
+import { RECIPE_GROUPS, TEMPLATE_CHIPS, type ContentKit, type ContentKitInput, type Platform, type TemplateChip } from "@cs/prompts";
 import { CampaignPanel } from "./CampaignPanel";
 import { useT, useLang } from "../LangProvider";
 
@@ -39,6 +39,13 @@ function copy(text: string) {
   void navigator.clipboard.writeText(text);
 }
 
+interface BrainstormIdea {
+  title: string;
+  angle: string;
+  hook_preview: string;
+  format: string;
+}
+
 function StudioInner() {
   const params = useSearchParams();
   const t = useT();
@@ -69,6 +76,11 @@ function StudioInner() {
   const [stylesList, setStylesList] = useState<StyleRow[]>([]);
   const [brandId, setBrandId] = useState("");
   const [styleId, setStyleId] = useState("");
+  const [ideas, setIdeas] = useState<BrainstormIdea[] | null>(null);
+  const [ideasLoading, setIdeasLoading] = useState(false);
+  const [ideasError, setIdeasError] = useState<string | null>(null);
+  const [hydrating, setHydrating] = useState(false);
+  const [hydrateError, setHydrateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -78,6 +90,40 @@ function StudioInner() {
       db.from("brands").select("*").then(({ data: b }) => setBrands((b ?? []) as BrandRow[]));
       db.from("styles").select("*").then(({ data: s }) => setStylesList((s ?? []) as StyleRow[]));
     });
+  }, []);
+
+  // Reopen a previously-generated kit from /history ("เปิดดู →" links here with
+  // ?jobId=<generation id>) instead of re-running the AI — the full output was
+  // already persisted by /api/generate and just needs to be read back.
+  useEffect(() => {
+    const jobId = params.get("jobId");
+    if (!jobId || !isSupabaseConfigured()) return;
+    setHydrating(true);
+    setHydrateError(null);
+    const db = browserClient();
+    getGeneration(db, jobId)
+      .then((gen) => {
+        if (!gen || gen.type !== "content_kit") {
+          // Not found (deleted row, bad id) or not a content_kit row — don't
+          // pretend nothing happened; the user came here expecting saved
+          // content, so a blank form with no explanation would look broken.
+          setHydrateError(t("studio.load_saved_not_found"));
+          return;
+        }
+        const input = gen.input as Partial<ContentKitInput>;
+        setTopic(input.topic ?? gen.title ?? "");
+        setNiche(input.niche ?? "");
+        if (input.platforms?.length) setPlatforms(input.platforms);
+        if (input.template && input.template in TEMPLATE_CHIPS) setTemplate(input.template);
+        setKit(gen.output as ContentKit);
+        setGenerationId(gen.id);
+      })
+      // getGeneration throws on a real Postgrest/network error (vs. returning
+      // null for "not found") — surface it instead of failing silently.
+      .catch(() => setHydrateError(t("studio.load_saved_error")))
+      .finally(() => setHydrating(false));
+    // Only ever reopen once, off the jobId present at first render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function generate() {
@@ -99,6 +145,33 @@ function StudioInner() {
     } finally {
       setLoading(null);
     }
+  }
+
+  async function getIdeas() {
+    const seed = topic.trim() || niche.trim();
+    if (!seed) return;
+    setIdeasLoading(true);
+    setIdeasError(null);
+    setIdeas(null);
+    try {
+      const res = await fetch("/api/brainstorm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ topic_or_niche: seed, platforms }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setIdeas(data.ideas);
+    } catch (e) {
+      setIdeasError((e as Error).message);
+    } finally {
+      setIdeasLoading(false);
+    }
+  }
+
+  function pickIdea(idea: BrainstormIdea) {
+    setTopic(idea.title);
+    setIdeas(null);
   }
 
   async function refineAll(section?: "hook" | "script" | "visual" | "hashtags", instruction?: string) {
@@ -165,14 +238,46 @@ function StudioInner() {
   return (
     <div>
       <h1>{t("studio.title")}</h1>
+      {hydrating && <p className="dim">{t("studio.loading_saved")}</p>}
+      {hydrateError && <p style={{ color: "var(--danger)" }}>{hydrateError}</p>}
       <div className="card">
         <div className="label">{t("studio.topic_label")}</div>
         <textarea
           className="input" rows={2}
-          placeholder={t("studio.topic_placeholder")}
+          placeholder={
+            template
+              ? (lang === "th" ? TEMPLATE_CHIPS[template].topic_hint_th : TEMPLATE_CHIPS[template].topic_hint_en)
+              : t("studio.topic_placeholder")
+          }
           value={topic} onChange={(e) => setTopic(e.target.value)}
         />
-        <div className="label">{t("studio.recipes_label")}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+          <button className="btn sm" disabled={!topic.trim() && !niche.trim() || ideasLoading} onClick={getIdeas}>
+            {ideasLoading ? <><span className="spin" /> {t("studio.brainstorm_loading")}</> : t("studio.brainstorm_btn")}
+          </button>
+          <span className="dim" style={{ fontSize: 12 }}>{t("studio.brainstorm_hint")}</span>
+        </div>
+        {ideasError && <p style={{ color: "var(--danger)" }}>{ideasError}</p>}
+        {ideas && (
+          <div style={{ marginTop: 10 }}>
+            <div className="dim" style={{ fontSize: 12, marginBottom: 6 }}>{t("studio.brainstorm_pick")}</div>
+            {ideas.map((idea, i) => (
+              <div key={i} className="caption-box" style={{ marginBottom: 8, cursor: "pointer" }}
+                role="button" tabIndex={0}
+                onClick={() => pickIdea(idea)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    pickIdea(idea);
+                  }
+                }}>
+                <b>{idea.title}</b>
+                <div className="dim" style={{ fontSize: 12.5, marginTop: 2 }}>{idea.angle} · {idea.format}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="label" style={{ marginTop: 14 }}>{t("studio.recipes_label")}</div>
         {RECIPE_GROUPS.map((g) => (
           <div key={g.group_th} style={{ marginBottom: 4 }}>
             <div className="dim" style={{ fontSize: 12, margin: "6px 0 4px" }}>{g.icon} {lang === "th" ? g.group_th : g.group_en}</div>
@@ -230,7 +335,7 @@ function StudioInner() {
         )}
         <div style={{ marginTop: 16 }}>
           <button className="btn primary" style={{ width: "100%", justifyContent: "center" }}
-            disabled={!topic.trim() || !platforms.length || !!loading} onClick={generate}>
+            disabled={!topic.trim() || !platforms.length || !!loading || hydrating} onClick={generate}>
             {loading ? <><span className="spin" /> {loading}</> : t("studio.generate_btn")}
           </button>
         </div>
