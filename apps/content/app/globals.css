@@ -78,7 +78,7 @@ h3 { font-size: 14px; font-weight: 600; }
 .nav-item.active .t { font-weight: 600; }
 .nav-item .s { font-size: 11.5px; color: var(--text-dim); }
 
-.main { flex: 1; padding: 28px 36px; max-width: 1180px; }
+.main { flex: 1; padding: 28px 36px; max-width: 1180px; margin: 0 auto; }
 
 .card {
   background: var(--bg-raised); border: 1px solid var(--border);
